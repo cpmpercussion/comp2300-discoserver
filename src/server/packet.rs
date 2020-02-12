@@ -43,7 +43,7 @@ fn read_checksum(check: &[u8]) -> Result<u8, hex::FromHexError> {
     if check.len() != 2 {
         return Err(hex::FromHexError::InvalidStringLength);
     }
-    return Ok(*hex::decode(check)?.first().unwrap());
+    return Ok(*hex::decode(check)?.first().expect("failed to read checksum"));
 }
 
 fn build_checksum(pack: &[u8]) -> String {

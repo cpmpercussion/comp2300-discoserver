@@ -82,7 +82,7 @@ fn handle_client(mut stream: TcpStream) {
 
     match get_elf_file_path() {
         Some(p) => {
-            board.load_elf_from_path(&p).unwrap();
+            board.load_elf_from_path(&p).expect("failed to load elf file");
         },
         None => {
             return;
@@ -102,7 +102,7 @@ fn handle_client(mut stream: TcpStream) {
                     }
                 };
 
-                // println!("received {:?}", std::str::from_utf8(pack.data.as_ref()));
+                println!("received {:?}", std::str::from_utf8(pack.data.as_ref()));
 
                 let out: Vec<u8> = if pack.data.starts_with(b"qSupported") {
                      build_reply(b"PacketSize=2048")
@@ -125,7 +125,12 @@ fn handle_client(mut stream: TcpStream) {
                 } else if pack.data == b"qOffsets" {
                     build_reply(b"Text=0;Data=0;Bss=0")
                 } else if pack.data == b"g" {
-                    build_reply(b"00000000")
+                    let mut vals = String::new();
+                    for i in 0..=14u32 {
+                        let rval = board.read_reg(i).swap_bytes();
+                        vals += &word_to_hex(rval);
+                    }
+                    build_reply(vals.as_ref())
                 } else if pack.data.starts_with(b"c") {
                     // HACK: Really, the board should be running on a separate thread to
                     //       the TCP handler. However, right now we just intermittently
@@ -147,7 +152,7 @@ fn handle_client(mut stream: TcpStream) {
                         };
                         for _ in 0..100 {
                             if !breakpoints.contains(&board.cpu.read_instruction_pc()) {
-                                board.step().unwrap();
+                                board.step().expect("failed to step board emulation");
                             }
                         }
                     }
@@ -155,12 +160,12 @@ fn handle_client(mut stream: TcpStream) {
                     stream.set_nonblocking(false).expect("set_nonblocking call failed");
                     build_reply(b"S05")
                 } else if pack.data.starts_with(b"s") {
-                    board.step().unwrap();
+                    board.step().expect("failed to step board emulation");
 
                     match hex_to_word(&pack.data[1..]) {
                         Ok(addr) => {
                             while board.cpu.read_instruction_pc() != addr {
-                                board.step().unwrap();
+                                board.step().expect("failed to step board emulation");
                             }
                         },
                         Err(_) => {}
@@ -170,8 +175,8 @@ fn handle_client(mut stream: TcpStream) {
                 } else if pack.data.starts_with(b"Z") {
                     match pack.data.get(1) {
                         Some(b'0') => {
-                            let addr = pack.data[3..].split(|c| *c == b',').next().unwrap();
-                            breakpoints.insert(hex_to_word(addr).unwrap());
+                            let addr = pack.data[3..].split(|c| *c == b',').next().expect("expected ',' in Z0 packet");
+                            breakpoints.insert(hex_to_word(addr).expect("failed to read hex address in Z0 packet"));
                             build_reply(b"OK")
                         },
                         Some(_) | None => {
@@ -181,8 +186,8 @@ fn handle_client(mut stream: TcpStream) {
                 } else if pack.data.starts_with(b"z") {
                     match pack.data.get(1) {
                         Some(b'0') => {
-                            let addr = pack.data[3..].split(|c| *c == b',').next().unwrap();
-                            breakpoints.remove(&hex_to_word(addr).unwrap());
+                            let addr = pack.data[3..].split(|c| *c == b',').next().expect("expected ',' in Z0 packet");
+                            breakpoints.remove(&hex_to_word(addr).expect("failed to read hex address in Z0 packet"));
                             build_reply(b"OK")
                         },
                         Some(_) | None => {
@@ -193,7 +198,7 @@ fn handle_client(mut stream: TcpStream) {
                     // read register X where request is pX
 
                     let num = &pack.data[1..];
-                    let k = hex_to_word(num).unwrap();
+                    let k = hex_to_word(num).expect("failed to read hex register in p packet");
                     let rval = if k == 15 {
                         board.cpu.read_instruction_pc().swap_bytes()
                     } else if k < 15 {
@@ -217,7 +222,7 @@ fn handle_client(mut stream: TcpStream) {
                     return;
                 };
 
-                // println!("sending {:?}", std::str::from_utf8(out.as_ref()));
+                println!("sending {:?}", std::str::from_utf8(out.as_ref()));
                 stream.write(out.as_ref()).unwrap();
             }
             true
