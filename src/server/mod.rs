@@ -1,6 +1,5 @@
-use crate::server::packet::hex_to_word;
-use crate::server::packet::word_to_hex;
-use crate::server::packet::build_reply;
+use crate::server::packet::{hex_to_word, word_to_hex, build_reply};
+use std::collections::HashSet;
 use std::env;
 use std::ffi::{OsString};
 use std::error::Error;
@@ -17,7 +16,7 @@ mod packet;
 use packet::read_packet;
 
 pub fn start_server() {
-    let port: String = get_tcp_port().unwrap();
+    let port: String = get_tcp_port().expect("must provide TCP port");
 
     let listener = match TcpListener::bind(format!("127.0.0.1:{}", port)) {
         Ok(s) => s,
@@ -40,7 +39,7 @@ fn get_tcp_port() -> Option<String> {
     let args: Vec<OsString> = env::args_os().collect();
     for arg in args {
         if arg.to_str().expect("").starts_with("tcp::") {
-            let port = &arg.to_str().expect("")[5..];
+            let port = &arg.to_str().unwrap()[5..];
             return Some(String::from(port));
         }
     };
@@ -70,8 +69,6 @@ fn parse_read_memory(mut data: &[u8]) -> Result<(u32, u32), ()> {
 
     return Ok((hex_to_word(addr)?, hex_to_word(length)?));
 }
-
-use std::collections::HashSet;
 
 fn handle_client(mut stream: TcpStream) {
     stream.set_nodelay(true).expect("cannot set no delay");
@@ -138,7 +135,7 @@ fn handle_client(mut stream: TcpStream) {
                     //       fewer times we check -> faster emulation -> more latency
                     //       in the interrupt.
                     stream.set_nonblocking(true).expect("set_nonblocking call failed");
-                    stream.write(build_reply(b"").as_ref()).unwrap();
+                    stream.write(b"+").unwrap();
 
                     while !breakpoints.contains(&board.cpu.read_instruction_pc()) {
                         match stream.read(&mut data) {
@@ -146,11 +143,13 @@ fn handle_client(mut stream: TcpStream) {
                                 if size == 1 && data[0] == 0x03 {
                                     println!("received interrupt");
                                     break;
+                                } else {
+                                    println!("got {:?}", &data[0..size]);
                                 }
                             },
                             Err(_) => {}
                         };
-                        for _ in 0..100 {
+                        for _ in 0..128 {
                             if !breakpoints.contains(&board.cpu.read_instruction_pc()) {
                                 board.step().expect("failed to step board emulation");
                             }

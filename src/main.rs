@@ -648,7 +648,7 @@ impl Board {
 
     fn read_memory_region(&self, start: u32, bytes: u32) -> Result<Vec<u8>, String> {
         let mut out = Vec::new();
-        for i in start..(start + bytes) {
+        for i in start..(start.saturating_add(bytes)) {
             match self.memory.read_byte(i) {
                 Ok(i) => out.push(i),
                 Err(_) => {
