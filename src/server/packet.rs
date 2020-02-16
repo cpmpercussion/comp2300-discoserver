@@ -5,17 +5,19 @@ use std::str;
 
 extern crate hex;
 
+#[derive(Debug)]
 pub enum PacketKind {
     Qsupported,
 }
 
+#[derive(Debug)]
 pub struct Packet {
     pub data: Vec<u8>,
     checksum: u8,
 }
 
 impl Packet {
-    fn new(data: &[u8], checksum: u8) -> Packet {
+    pub fn new(data: &[u8], checksum: u8) -> Packet {
         return Packet {
             data: data.to_vec(),
             checksum: checksum,
@@ -51,7 +53,7 @@ fn build_checksum(pack: &[u8]) -> String {
     for c in pack {
         sum = sum.wrapping_add(*c);
     };
-    return hex::encode([sum]);
+    return format!("{:02X?}", sum);
 }
 
 fn decode_packet(data: &[u8]) -> Result<Vec<u8>, ()> {
@@ -87,7 +89,7 @@ fn decode_packet(data: &[u8]) -> Result<Vec<u8>, ()> {
     return Ok(out);
 }
 
-fn validate_packet(data: &[u8], check: u8) -> bool {
+pub fn validate_packet(data: &[u8], check: u8) -> bool {
     let mut sum: u8 = 0;
     for i in data {
         sum = sum.wrapping_add(*i);
@@ -104,17 +106,20 @@ pub fn read_packet(mut data: &[u8]) -> Result<Packet, ()> {
     // $...#cc
     // where $ is literal, # is literal, cc is checksum in ASCII hexadecimal, and ... is the data
     if data.len() < 4 || data[0] != b'$' || data[data.len() - 3] != b'#' {
+        println!("unexpected packet kind: {:?}", data);
         return Err(());
     }
 
     let checksum = match read_checksum(&data[data.len() - 2..]) {
         Ok(c) => c,
         Err(e) => {
+            println!("cannot read checksum");
             return Err(());
         }
     };
 
     if !validate_packet(&data[1..data.len() - 3], checksum) {
+        println!("invalid checksum");
         return Err(());
     }
 

@@ -249,6 +249,15 @@ impl CPU {
     pub fn get_apsr_display(&self) -> String {
         return format!("{}", self.apsr);
     }
+
+    pub fn read_xpsr(&self) -> u32 {
+        let n: u32 = self.apsr.n.into();
+        let z: u32 = self.apsr.z.into();
+        let c: u32 = self.apsr.c.into();
+        let v: u32 = self.apsr.v.into();
+        let q: u32 = self.apsr.q.into();
+        return n << 31 | z << 30 | c << 29 | v << 28 | q << 27;
+    }
 }
 
 impl fmt::Display for CPU {

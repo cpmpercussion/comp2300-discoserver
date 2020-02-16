@@ -14,23 +14,47 @@ cargo --version
 cargo build
 ```
 
-3. For a discoboard project, add the following to `.vscode/launch.json` configurations. Make sure to use the correct paths. Newer versions of platformio use `.pio/build` instead of `.pioenvs`. Change `debug` to `release` in `serverpath` if you want to use a release build made with `cargo build --release` (use this if you want the best performance, such as when testing audio).
-```
-{
-    "type": "cortex-debug",
-    "request": "launch",
-    "name": "ARM Emulator Debug",
-    "cwd": "${workspaceRoot}",
-    "device": "STM32L476vg",
-    "executable": "${workspaceRoot}/.pioenvs/disco_l476vg/firmware.elf",
-    "servertype": "qemu",
-    "preLaunchTask": "PlatformIO: Build",
-    "serverpath": "/abs/path/to/project/.../arm-emulator/target/debug/arm-emulator",
-    "postLaunchCommands": [
-        "-break-insert main"
-    ]
-}
-```
-  - Note `serverpath` may be marked as "not allowed". The schema is wrong, it is in fact allowed (tested with `cortex-debug` v0.2.7; this has been fixed in later versions).
+3. Follow one of the following to use this to debug a discoboard project. Make sure to use the correct paths instead of the placeholders. Newer versions of platformio use `.pio/build` instead of `.pioenvs`. Change `debug` to `release` in the emulator path if you want to use a release build made with `cargo build --release` (use this if you want the best performance, such as when testing audio).
+
+    1. If using `cortex-debug` to debug, add the following to `.vscode/launch.json` configurations.
+
+    ```
+    {
+        "type": "cortex-debug",
+        "request": "launch",
+        "name": "ARM Emulator Debug",
+        "cwd": "${workspaceRoot}",
+        "device": "STM32L476vg",
+        "executable": "${workspaceRoot}/.pioenvs/disco_l476vg/firmware.elf",
+        "servertype": "qemu",
+        "preLaunchTask": "PlatformIO: Build",
+        "serverpath": "/abs/path/to/project/.../comp2300-disco-emulator/target/debug/arm-emulator",
+        "postLaunchCommands": [
+            "-break-insert main"
+        ]
+    }
+    ```
+
+    - Note `serverpath` may be marked as "not allowed". The schema is wrong, it is in fact allowed (tested with `cortex-debug` v0.2.7; this has been fixed in later versions).
+
+    2. If using `platformio`, add the following to your `platformio.ini`. You may need to comment out the existing entry to convince platformio to debug using this configuration.
+
+    ```
+    [env:emulate]
+    platform = ststm32@6.0.0
+    board = disco_l476vg
+    framework = stm32cube
+    build_flags = -g -O0
+    debug_tool = custom
+    debug_port = localhost:50030; or whatever port you want. Fix the corresponding  debug_server arg if changed.
+    debug_server =
+        /abs/path/to/project/.../comp2300-disco-emulator/target/debug/arm-emulator
+        tcp::50030
+        -kernel
+        /Users/benjamingray/gitlab/comp2300-2019-assignment-2/.pio/build/emulate/firmware.elf
+    debug_init_cmds =
+      target remote $DEBUG_PORT
+      b main
+    ```
 
 4. Select the `ARM Emulator Debug` option in the debug selection and use it like normal.
