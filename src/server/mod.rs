@@ -276,8 +276,16 @@ impl GdbServer {
                             self.send_reply(b"Text=0;Data=0;Bss=0");
                         }
                         Query::ExecCommand { command } => {
-                            println!("executing {:?}", std::str::from_utf8(&command));
-                            self.send_reply_ok();
+                            match command.as_slice() {
+                                b"reset halt" => {
+                                    println!("restart not supported");
+                                    self.send_reply_empty();
+                                }
+                                _ => {
+                                    println!("unknown command: {:?}", std::str::from_utf8(&command));
+                                    self.send_reply_empty();
+                                }
+                            }
                         }
                         Query::Supported {..} => {
                             let m = format!("PacketSize={:X?};QStartNoAckMode+", self.tcp_buffer.len());
@@ -552,16 +560,20 @@ impl GdbServer {
         packet = &packet[1..];
         let command = leading_alpha(&packet);
         let all = command.len() == packet.len();
-
-        println!("handling {:?}", command);
-
         return Ok(Request::Query { query: match command {
             b"C" if all => Query::CurrentThread,
             b"Supported" => {
                 // we don't really care what it declares
                 Query::Supported { features: Vec::new() }
             },
-            b"Rcmd" => Query::ExecCommand { command: packet[5..].to_vec() },
+            b"Rcmd" => {
+                if let Ok(command) = parse_hex_bytes(&packet[5..]) {
+                    Query::ExecCommand { command }
+                } else {
+                    println!("failed to parse qRcmd command");
+                    return Err(());
+                }
+            }
             b"Offsets" if all => Query::SectionOffsets,
             b"fThreadInfo" if all => Query::ThreadInfoFirst,
             b"sThreadInfo" if all => Query::ThreadInfoSubsequent,
@@ -572,6 +584,7 @@ impl GdbServer {
             b"TfV" if all => Query::TracevariableFirst,
             b"TsV" if all => Query::TracevariableSubsequent,
             _ => {
+                println!("unhandled query {:?}", std::str::from_utf8(command));
                 return Ok(Request::Unhandled);
             }
         }});

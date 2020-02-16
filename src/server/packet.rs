@@ -19,8 +19,8 @@ pub fn word_to_hex(word: u32) -> String {
 
 pub fn validate_packet(data: &[u8], check: u8) -> bool {
     let mut sum: u8 = 0;
-    for i in data {
-        sum = sum.wrapping_add(*i);
+    for &i in data {
+        sum = sum.wrapping_add(i);
     }
     return sum == check;
 }
