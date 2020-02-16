@@ -57,4 +57,4 @@ cargo build
       b main
     ```
 
-4. Select the `ARM Emulator Debug` option in the debug selection and use it like normal.
+4. Select the `ARM Emulator Debug` (or `PIO Debug` if platformio) option in the debug selection and use it like normal.
