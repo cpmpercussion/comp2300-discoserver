@@ -114,70 +114,6 @@ impl Condition {
     }
 }
 
-#[derive(Debug)]
-pub struct ItState {
-    state: u32,
-}
-
-impl ItState {
-    fn new() -> ItState {
-        return ItState {
-            state: 0,
-        };
-    }
-
-    fn active(&self) -> bool {
-        return self.state != 0;
-    }
-
-    fn advance(&mut self) {
-        if (self.state & 0b111) == 0 {
-            self.state = 0;
-        } else {
-            self.state = self.state & (0b111 << 5) | (self.state & 0xF) << 1;
-        }
-    }
-
-    fn condition(&self) -> Condition {
-        return Condition::new(self.state >> 4);
-    }
-
-    fn position(&self) -> ItPos {
-        return if self.state == 0 {
-            ItPos::None
-        } else if (self.state & 0b111) == 0 {
-            ItPos::Last
-        } else {
-            ItPos::Within
-        }
-    }
-
-    fn num_remaining(&self) -> u32 {
-        for i in 0..=3 {
-            if bitset(self.state, i) {
-                return 4 - i;
-            }
-        }
-        return 0;
-    }
-}
-
-impl fmt::Display for ItState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        return match self.position() {
-            ItPos::None => {
-                write!(f, "IT: None")
-            }
-            ItPos::Within => {
-                write!(f, "IT: Within ({} remaining), Cond: {:?}", self.num_remaining(), self.condition())
-            }
-            ItPos::Last => {
-                write!(f, "IT: Last, Cond: {:?}", self.condition())
-            }
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Location {
     Flash(usize),
@@ -391,7 +327,6 @@ pub struct Board {
     memory: MemoryBus,
     register_formats: [RegFormat; 16],
     branch_map: HashMap<u32, String>,
-    itstate: ItState
 }
 
 /**
@@ -409,7 +344,6 @@ impl Board {
             memory: MemoryBus::new(),
             register_formats: [RegFormat::Hex; 16],
             branch_map: HashMap::new(),
-            itstate: ItState::new(),
         };
     }
 
@@ -429,7 +363,7 @@ impl Board {
         let mut start = tag::from(instruction);
         if !tag::has_cached(start) {
             let raw = self.memory.get_instr_word(pc)?;
-            let decoded = decode_thumb(raw, InstructionContext::new(pc, self.itstate.position()));
+            let decoded = decode_thumb(raw, InstructionContext::new(pc, self.cpu.itstate.position()));
             instruction = decoded.0;
             start = tag::from(instruction);
             if decoded.1 {
@@ -465,9 +399,9 @@ impl Board {
         let data = instr.0 & 0xFFFF;
         let extra = instr.1 & !(0b11 << 30);
 
-        if self.itstate.active() {
-            let execute = self.cpu.check_condition(self.itstate.condition());
-            self.itstate.advance();
+        if self.cpu.itstate.active() {
+            let execute = self.cpu.check_condition(self.cpu.itstate.condition());
+            self.cpu.itstate.advance();
             if !execute {
                 println!("IT condition failed");
                 return Ok(());
@@ -781,7 +715,7 @@ impl Board {
     }
 
     fn in_it_block(&self) -> bool {
-        return self.itstate.active();
+        return self.cpu.itstate.active();
     }
 
     /**
@@ -1175,7 +1109,7 @@ impl Board {
 
     fn n_it(&mut self, data: u32) {
         // A7.7.38
-        self.itstate.state = data;
+        self.cpu.itstate.state = data;
     }
 
     fn ldc_imm(&mut self) {
@@ -1954,7 +1888,7 @@ impl fmt::Display for Board {
             ));
         }
         registers.push('\n');
-        registers.push_str(&format!("{}{}\n{}{}\n", indent, self.cpu.get_apsr_display(), indent, self.itstate));
+        registers.push_str(&format!("{}{}\n{}{}\n", indent, self.cpu.get_apsr_display(), indent, self.cpu.itstate));
         return write!(f, "CPU {{\n{}}}", registers);
     }
 }

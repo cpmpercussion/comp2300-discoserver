@@ -623,7 +623,6 @@ impl GdbServer {
     // Receives a packet from the TCP stream
     fn receive_packet(&mut self) -> Result<(Vec<u8>, bool), ()> {
         loop {
-            // println!("receiving packet...");
             if let Some(p) = self.packets.pop_front() {
                 return Ok(p);
             }
@@ -638,7 +637,6 @@ impl GdbServer {
     }
 
     fn process_tcp_packet(&mut self) -> Result<(), ()> {
-        // println!("reading tcp...");
         let size = match self.stream.read(&mut self.tcp_buffer) {
             Ok(s) => s,
             Err(e) => {

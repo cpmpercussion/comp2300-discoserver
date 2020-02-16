@@ -5,7 +5,71 @@ use crate::peripherals::Peripheral;
 use crate::utils::io::read_register;
 use crate::utils::bits::{bitset, add_with_carry, shift, shift_c, align};
 use crate::instruction::{CarryChange, Instruction, ShiftType};
+use crate::bytecode::{ItPos};
 
+#[derive(Debug)]
+pub struct ItState {
+    pub state: u32,
+}
+
+impl ItState {
+    pub fn new() -> ItState {
+        return ItState {
+            state: 0,
+        };
+    }
+
+    pub fn active(&self) -> bool {
+        return self.state != 0;
+    }
+
+    pub fn advance(&mut self) {
+        if (self.state & 0b111) == 0 {
+            self.state = 0;
+        } else {
+            self.state = self.state & (0b111 << 5) | (self.state & 0xF) << 1;
+        }
+    }
+
+    pub fn condition(&self) -> Condition {
+        return Condition::new(self.state >> 4);
+    }
+
+    pub fn position(&self) -> ItPos {
+        return if self.state == 0 {
+            ItPos::None
+        } else if (self.state & 0b111) == 0 {
+            ItPos::Last
+        } else {
+            ItPos::Within
+        }
+    }
+
+    pub fn num_remaining(&self) -> u32 {
+        for i in 0..=3 {
+            if bitset(self.state, i) {
+                return 4 - i;
+            }
+        }
+        return 0;
+    }
+}
+
+impl fmt::Display for ItState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        return match self.position() {
+            ItPos::None => {
+                write!(f, "IT: None")
+            }
+            ItPos::Within => {
+                write!(f, "IT: Within ({} remaining), Cond: {:?}", self.num_remaining(), self.condition())
+            }
+            ItPos::Last => {
+                write!(f, "IT: Last, Cond: {:?}", self.condition())
+            }
+        }
+    }
+}
 
 #[derive(Debug)]
 struct APSR {
@@ -106,6 +170,7 @@ pub struct CPU {
     apsr: APSR,
     ipsr: IPSR,
     epsr: EPSR,
+    pub itstate: ItState,
     control: Control,
     pub current_mode: ExecMode,
 }
@@ -121,6 +186,7 @@ impl CPU {
             apsr: APSR::new(),
             ipsr: IPSR::new(),
             epsr: EPSR::new(),
+            itstate: ItState::new(),
             control: Control::new(),
             current_mode: ExecMode::ModeThread,
         };
@@ -251,12 +317,24 @@ impl CPU {
     }
 
     pub fn read_xpsr(&self) -> u32 {
-        let n: u32 = self.apsr.n.into();
-        let z: u32 = self.apsr.z.into();
-        let c: u32 = self.apsr.c.into();
-        let v: u32 = self.apsr.v.into();
-        let q: u32 = self.apsr.q.into();
-        return n << 31 | z << 30 | c << 29 | v << 28 | q << 27;
+        let n = u32::from(self.apsr.n) << 31;
+        let z = u32::from(self.apsr.z) << 30;
+        let c = u32::from(self.apsr.c) << 29;
+        let v = u32::from(self.apsr.v) << 28;
+        let q = u32::from(self.apsr.q) << 27;
+        let ge = u32::from(self.apsr.ge & 0xF) << 16;
+        let apsr = n | z | c | v | q | ge;
+
+        let it_ici = self.itstate.state & 0xFF;
+        let t: u32 = u32::from(self.epsr.t) << 24;
+        let ici1 = (it_ici & 0b11) << 25;
+        let ici2 = ((it_ici >> 2) & 0b11) << 10;
+        let ici3 = ((it_ici >> 4) & 0b1111) << 12;
+        let epsr = ici1 | ici2 | ici3 | t;
+
+        let ipsr = self.ipsr.exception & 0x1FF;
+
+        return apsr | epsr | ipsr;
     }
 }
 
