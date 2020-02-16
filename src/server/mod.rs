@@ -1,9 +1,8 @@
 mod packet;
-use packet::{read_packet, hex_to_word, word_to_hex, build_reply, validate_packet, Packet};
+use packet::{hex_to_word, word_to_hex, validate_packet, is_hex_char, hex_to_byte, get_checksum_hex, get_u8_from_hex, leading_alpha};
 
 mod query;
 use query::{Query, Set};
-
 
 use std::collections::{HashSet, VecDeque};
 use std::env;
@@ -82,34 +81,7 @@ enum Request {
     EditBreakpoint { address: u32, set: bool, btype: BreakpointType, kind: BreakpointKind },
 }
 
-fn is_hex_char(c: u8) -> bool {
-    return match c {
-        b'0'..=b'9' => true,
-        b'a'..=b'f' => true,
-        b'A'..=b'F' => true,
-        _ => false,
-    };
-}
-
-// Takes a ASCII hex number [0-9a-fA-F] and returns the value as a u8
-fn hex_to_byte(c: u8) -> Result<u8, ()> {
-    return match c {
-        b'0'..=b'9' => Ok(c - b'0'),
-        b'a'..=b'f' => Ok(c - b'a' + 10),
-        b'A'..=b'F' => Ok(c - b'A' + 10),
-        _ => Err(()),
-    };
-}
-
-fn get_u8_from_hex(hex: (u8, u8)) -> Result<u8, ()> {
-    if let (Ok(b1), Ok(b2)) = (hex_to_byte(hex.0), hex_to_byte(hex.1)) {
-        return Ok(b1 * 16 + b2);
-    } else {
-        return Err(());
-    }
-}
-
-struct GdbServer {
+pub struct GdbServer {
     stream: TcpStream,
     tcp_buffer: Box<[u8]>,
     packet_builder: Vec<u8>,
@@ -136,12 +108,42 @@ impl GdbServer {
         }
     }
 
+    pub fn start_server() {
+        let port: String = get_tcp_port_from_argv().expect("must provide TCP port");
+
+        let listener = match TcpListener::bind(format!("127.0.0.1:{}", port)) {
+            Ok(s) => s,
+            Err(e) => {
+                println!("errr");
+                return;
+            }
+        };
+
+        match listener.accept() {
+            Ok((socket, addr)) => {
+                println!("connected");
+                GdbServer::handle_client(socket);
+            }
+            Err(e) => {
+                return;
+            }
+        }
+    }
+
+    fn handle_client(stream: TcpStream) {
+        let mut server = GdbServer::new(stream, 2048);
+
+        if let Err(e) = server.run(false) {
+            println!("server error: {:?}", e);
+        };
+    }
+
     fn run(&mut self, audio: bool) -> Result<(), ()> {
         if let Err(e) = self.stream.set_nodelay(true) {
             println!("cannot set no delay on TCP stream: {}", e);
         };
 
-        if let Some(path) = get_elf_file_path() {
+        if let Some(path) = get_elf_file_path_from_argv() {
             self.board.load_elf_from_path(&path).expect("failed to load from ELF file");
         } else {
             println!("ELF file path not provided");
@@ -167,6 +169,10 @@ impl GdbServer {
                 Request::AcknowledgeFailure => {/* do nothing*/},
                 Request::MustReplyEmpty => {
                     self.send_reply_empty();
+                }
+                Request::Kill => {
+                    println!("shutting down server loop");
+                    return Ok(());
                 }
                 Request::EnableExtendedMode => {
                     self.send_reply_ok();
@@ -494,8 +500,7 @@ impl GdbServer {
                 return Ok(Request::WriteMemory {
                     address: hex_to_word(a)?,
                     length: hex_to_word(l)?,
-                    bytes: Vec::new(),
-                    // bytes: parse_hex_bytes(b)?,
+                    bytes: parse_hex_bytes(b)?,
                 });
             }
             _ => {
@@ -693,60 +698,7 @@ impl GdbServer {
     }
 }
 
-fn get_checksum_hex(packet: &[u8]) -> String {
-    let mut sum: u8 = 0;
-    for &b in packet {
-        sum = sum.wrapping_add(b);
-    };
-    return format!("{:02X?}", sum);
-}
-
-pub fn start_server() {
-    let port: String = get_tcp_port().expect("must provide TCP port");
-
-    let listener = match TcpListener::bind(format!("127.0.0.1:{}", port)) {
-        Ok(s) => s,
-        Err(e) => {
-            println!("errr");
-            return;
-        }
-    };
-
-    match listener.accept() {
-        Ok((socket, addr)) => {
-            println!("connected");
-            handle_client(socket);
-        }
-        Err(e) => {
-            return;
-        }
-    }
-}
-
-fn leading_alpha(data: &[u8]) -> &[u8] {
-    for i in 0..data.len() {
-        match data[i] {
-            b'a'..=b'z' | b'A'..=b'Z' => {},
-            _ => {
-                return &data[0..i];
-            }
-        }
-    }
-    return data;
-}
-
-enum Support<'a> {
-    Yes,
-    No,
-    Maybe,
-    Value(&'a [u8]),
-}
-
-fn parse_gdbfeature(feature: &[u8]) -> Result<(&[u8], Support), ()> {
-    return Err(());
-}
-
-fn get_tcp_port() -> Option<String> {
+fn get_tcp_port_from_argv() -> Option<String> {
     let args: Vec<OsString> = env::args_os().collect();
     for arg in args {
         if arg.to_str().expect("").starts_with("tcp::") {
@@ -757,7 +709,7 @@ fn get_tcp_port() -> Option<String> {
     return None;
 }
 
-fn get_elf_file_path() -> Option<PathBuf> {
+fn get_elf_file_path_from_argv() -> Option<PathBuf> {
     let mut args = env::args();
     while let Some(arg) = args.next() {
         if arg == "-kernel" {
@@ -785,188 +737,10 @@ fn parse_hex_bytes(data: &[u8]) -> Result<Vec<u8>, ()> {
     if data.len() % 2 != 0 {
         return Err(());
     }
-
     let mut out = Vec::new();
     let mut iter = data.chunks_exact(2);
     while let Some(&[a, b]) = iter.next() {
         out.push(get_u8_from_hex((a, b))?);
     }
     return Ok(out);
-}
-
-fn handle_client(stream: TcpStream) {
-    let mut server = GdbServer::new(stream, 2048);
-
-    if let Err(e) = server.run(false) {
-        println!("server error");
-    };
-
-    // stream.set_nodelay(true).expect("cannot set no delay");
-    // let mut breakpoints: HashSet<u32> = HashSet::new();
-    //
-    // let mut board = Board::new();
-    // // board.spawn_audio();
-    //
-    // match get_elf_file_path() {
-    //     Some(p) => {
-    //         board.load_elf_from_path(&p).expect("failed to load elf file");
-    //     },
-    //     None => {
-    //         return;
-    //     }
-    // }
-    //
-    // let mut data = [0 as u8; 2048];
-    // while match stream.read(&mut data) {
-    //     Ok(size) => {
-    //         if size <= 1 {
-    //             // interrupt 0x03 or + or -, etc
-    //         } else {
-    //             let pack = match read_packet(&data[0..size]) {
-    //                 Ok(p) => p,
-    //                 Err(e) => {
-    //                     println!("error reading packet");
-    //                     // return;
-    //                     // continue;
-    //                     Packet::new(b"0", 0)
-    //                 }
-    //             };
-    //
-    //             println!("received {:?}", std::str::from_utf8(pack.data.as_ref()));
-    //             // println!("received {:?}", std::str::from_utf8(pack.data[0..std::cmp::min(12, pack.data.len())].as_ref()));
-    //
-    //             let out: Vec<u8> = if pack.data.starts_with(b"qSupported") {
-    //                  build_reply(b"PacketSize=2048")
-    //             } else if pack.data.starts_with(b"X") || pack.data == b"!" || pack.data == b"Hg0" || pack.data.starts_with(b"Hc") || pack.data == b"qSymbol::"{
-    //                 build_reply(b"OK")
-    //             } else if pack.data == b"qTStatus" {
-    //                 build_reply(b"T0")
-    //             } else if pack.data.starts_with(b"v") || pack.data == b"qTfV" || pack.data == b"qTfP" {
-    //                 build_reply(b"")
-    //             } else if pack.data == b"?" {
-    //                 build_reply(b"S05")
-    //             } else if pack.data == b"qfThreadInfo" {
-    //                 build_reply(b"m0")
-    //             } else if pack.data == b"qsThreadInfo" {
-    //                 build_reply(b"l")
-    //             } else if pack.data == b"qC" {
-    //                 build_reply(b"QC0")
-    //             } else if pack.data == b"qAttached" {
-    //                 build_reply(b"0")
-    //             } else if pack.data == b"qOffsets" {
-    //                 build_reply(b"Text=0;Data=0;Bss=0")
-    //             } else if pack.data == b"g" {
-    //                 let mut vals = String::new();
-    //                 for i in 0..=14u32 {
-    //                     let rval = board.read_reg(i).swap_bytes();
-    //                     vals += &word_to_hex(rval);
-    //                 }
-    //                 build_reply(vals.as_ref())
-    //             } else if pack.data.starts_with(b"c") {
-    //                 // HACK: Really, the board should be running on a separate thread to
-    //                 //       the TCP handler. However, right now we just intermittently
-    //                 //       check the stream for the interupt. Bigger the skip size ->
-    //                 //       fewer times we check -> faster emulation -> more latency
-    //                 //       in the interrupt.
-    //                 stream.set_nonblocking(true).expect("set_nonblocking call failed");
-    //                 stream.write(b"+").unwrap();
-    //
-    //                 while !breakpoints.contains(&board.cpu.read_instruction_pc()) {
-    //                     match stream.read(&mut data) {
-    //                         Ok(size) => {
-    //                             if size == 1 && data[0] == 0x03 {
-    //                                 println!("received interrupt");
-    //                                 break;
-    //                             } else {
-    //                                 println!("got {:?}", &data[0..size]);
-    //                             }
-    //                         },
-    //                         Err(_) => {}
-    //                     };
-    //                     for _ in 0..128 {
-    //                         if !breakpoints.contains(&board.cpu.read_instruction_pc()) {
-    //                             board.step().expect("failed to step board emulation");
-    //                         }
-    //                     }
-    //                 }
-    //
-    //                 stream.set_nonblocking(false).expect("set_nonblocking call failed");
-    //                 build_reply(b"S05")
-    //             } else if pack.data.starts_with(b"s") {
-    //                 board.step().expect("failed to step board emulation");
-    //
-    //                 match hex_to_word(&pack.data[1..]) {
-    //                     Ok(addr) => {
-    //                         while board.cpu.read_instruction_pc() != addr {
-    //                             board.step().expect("failed to step board emulation");
-    //                         }
-    //                     },
-    //                     Err(_) => {}
-    //                 }
-    //
-    //                 build_reply(b"S05")
-    //             } else if pack.data.starts_with(b"Z") {
-    //                 match pack.data.get(1) {
-    //                     Some(b'0') => {
-    //                         let addr = pack.data[3..].split(|c| *c == b',').next().expect("expected ',' in Z0 packet");
-    //                         breakpoints.insert(hex_to_word(addr).expect("failed to read hex address in Z0 packet"));
-    //                         build_reply(b"OK")
-    //                     },
-    //                     Some(_) | None => {
-    //                         build_reply(b"")
-    //                     },
-    //                 }
-    //             } else if pack.data.starts_with(b"z") {
-    //                 match pack.data.get(1) {
-    //                     Some(b'0') => {
-    //                         let addr = pack.data[3..].split(|c| *c == b',').next().expect("expected ',' in Z0 packet");
-    //                         breakpoints.remove(&hex_to_word(addr).expect("failed to read hex address in Z0 packet"));
-    //                         build_reply(b"OK")
-    //                     },
-    //                     Some(_) | None => {
-    //                         build_reply(b"")
-    //                     },
-    //                 }
-    //             } else if pack.data.starts_with(b"p") {
-    //                 // read register X where request is pX
-    //
-    //                 let num = &pack.data[1..];
-    //                 let k = hex_to_word(num).expect("failed to read hex register in p packet");
-    //                 let rval = if k == 15 {
-    //                     board.cpu.read_instruction_pc().swap_bytes()
-    //                 } else if k < 15 {
-    //                     board.read_reg(k).swap_bytes()
-    //                 } else {
-    //                     0
-    //                 };
-    //
-    //                 build_reply(word_to_hex(rval).as_bytes())
-    //             } else if pack.data.starts_with(b"m") {
-    //                 let (start, length) = parse_read_memory(&pack.data).expect("cannot parse read memory");
-    //                 let vals = board.read_memory_region(start, length).expect("cannot read board memory region");
-    //
-    //                 let mut strs: Vec<u8> = Vec::new();
-    //                 for val in vals {
-    //                     strs.extend(format!("{:02x}", val).bytes());
-    //                 }
-    //
-    //                 build_reply(strs.as_slice())
-    //             } else if pack.data.starts_with(b"qRcmd") || pack.data.starts_with(b"X") || pack.data.starts_with(b"M") {
-    //                 build_reply(b"OK")
-    //             } else {
-    //                 println!("unrecognised command");
-    //                 build_reply(b"+")
-    //             };
-    //
-    //             println!("sending {:?}", std::str::from_utf8(out.as_ref()));
-    //             stream.write(out.as_ref()).expect("couldn't send reply");
-    //         }
-    //         true
-    //     },
-    //     Err(_) => {
-    //         println!("An error occurred, terminating connection with {:?}", stream.peer_addr());
-    //         stream.shutdown(Shutdown::Both).expect("failed to shutdown");
-    //         false
-    //     }
-    // } {};
 }

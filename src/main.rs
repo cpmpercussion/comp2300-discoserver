@@ -1960,9 +1960,9 @@ impl fmt::Display for Board {
 }
 
 mod server;
-use server::start_server;
+use server::GdbServer;
 
 fn main() {
     println!("started program");
-    start_server();
+    GdbServer::start_server();
 }

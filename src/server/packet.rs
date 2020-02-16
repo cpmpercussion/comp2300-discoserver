@@ -1,29 +1,5 @@
-use std::fs::File;
 use std::vec::Vec;
-use std::io::Write;
 use std::str;
-
-extern crate hex;
-
-#[derive(Debug)]
-pub enum PacketKind {
-    Qsupported,
-}
-
-#[derive(Debug)]
-pub struct Packet {
-    pub data: Vec<u8>,
-    checksum: u8,
-}
-
-impl Packet {
-    pub fn new(data: &[u8], checksum: u8) -> Packet {
-        return Packet {
-            data: data.to_vec(),
-            checksum: checksum,
-        };
-    }
-}
 
 pub fn hex_to_word(hex: &[u8]) -> Result<u32, ()> {
     let s = match str::from_utf8(hex) {
@@ -41,54 +17,6 @@ pub fn word_to_hex(word: u32) -> String {
     return format!("{:08x}", word);
 }
 
-fn read_checksum(check: &[u8]) -> Result<u8, hex::FromHexError> {
-    if check.len() != 2 {
-        return Err(hex::FromHexError::InvalidStringLength);
-    }
-    return Ok(*hex::decode(check)?.first().expect("failed to read checksum"));
-}
-
-fn build_checksum(pack: &[u8]) -> String {
-    let mut sum: u8 = 0;
-    for c in pack {
-        sum = sum.wrapping_add(*c);
-    };
-    return format!("{:02X?}", sum);
-}
-
-fn decode_packet(data: &[u8]) -> Result<Vec<u8>, ()> {
-    let mut out: Vec<u8> = Vec::with_capacity(data.len());
-
-    let mut iter = data.iter();
-
-    while let Some(&c) = iter.next() {
-        if c == b'}' {
-            match iter.next() {
-                Some(&e) => {
-                    out.push(e ^ 0x20);
-                }
-                None => return Err(()),
-            }
-        } else if c == b'*' {
-            let count = match iter.next() {
-                Some(&c) => c - 29,
-                None => return Err(()),
-            };
-            let copied = match out.last() {
-                Some(l) => *l,
-                None => return Err(()),
-            };
-            for _ in 0..count {
-                out.push(copied);
-            }
-        } else {
-            out.push(c);
-        }
-    }
-
-    return Ok(out);
-}
-
 pub fn validate_packet(data: &[u8], check: u8) -> bool {
     let mut sum: u8 = 0;
     for i in data {
@@ -97,42 +25,49 @@ pub fn validate_packet(data: &[u8], check: u8) -> bool {
     return sum == check;
 }
 
-pub fn read_packet(mut data: &[u8]) -> Result<Packet, ()> {
-    if data.starts_with(&[b'+']) {
-        data = &data[1..];
-    }
-
-    // Packet protocol:
-    // $...#cc
-    // where $ is literal, # is literal, cc is checksum in ASCII hexadecimal, and ... is the data
-    if data.len() < 4 || data[0] != b'$' || data[data.len() - 3] != b'#' {
-        println!("unexpected packet kind: {:?}", data);
-        return Err(());
-    }
-
-    let checksum = match read_checksum(&data[data.len() - 2..]) {
-        Ok(c) => c,
-        Err(e) => {
-            println!("cannot read checksum");
-            return Err(());
-        }
+pub fn is_hex_char(c: u8) -> bool {
+    return match c {
+        b'0'..=b'9' => true,
+        b'a'..=b'f' => true,
+        b'A'..=b'F' => true,
+        _ => false,
     };
-
-    if !validate_packet(&data[1..data.len() - 3], checksum) {
-        println!("invalid checksum");
-        return Err(());
-    }
-
-    return Ok(Packet::new(&data[1..data.len() - 3], checksum));
 }
 
-pub fn build_reply(data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<u8> = Vec::new();
+// Takes a ASCII hex number [0-9a-fA-F] and returns the value as a u8
+pub fn hex_to_byte(c: u8) -> Result<u8, ()> {
+    return match c {
+        b'0'..=b'9' => Ok(c - b'0'),
+        b'a'..=b'f' => Ok(c - b'a' + 10),
+        b'A'..=b'F' => Ok(c - b'A' + 10),
+        _ => Err(()),
+    };
+}
 
-    out.extend(b"+$");
-    out.extend(data);
-    out.push(b'#');
-    out.extend(build_checksum(data).as_bytes());
+pub fn get_u8_from_hex(hex: (u8, u8)) -> Result<u8, ()> {
+    if let (Ok(b1), Ok(b2)) = (hex_to_byte(hex.0), hex_to_byte(hex.1)) {
+        return Ok(b1 * 16 + b2);
+    } else {
+        return Err(());
+    }
+}
 
-    return out;
+pub fn leading_alpha(data: &[u8]) -> &[u8] {
+    for i in 0..data.len() {
+        match data[i] {
+            b'a'..=b'z' | b'A'..=b'Z' => {},
+            _ => {
+                return &data[0..i];
+            }
+        }
+    }
+    return data;
+}
+
+pub fn get_checksum_hex(packet: &[u8]) -> String {
+    let mut sum: u8 = 0;
+    for &b in packet {
+        sum = sum.wrapping_add(b);
+    };
+    return format!("{:02X?}", sum);
 }
