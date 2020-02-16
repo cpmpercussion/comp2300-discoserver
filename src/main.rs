@@ -659,6 +659,18 @@ impl Board {
         return Ok(out);
     }
 
+    fn write_memory_region(&mut self, start: u32, bytes: Vec<u8>) -> Result<(), ()> {
+        for i in start..(start.saturating_add(bytes.len() as u32)) {
+            match self.memory.write_mem_u(i, 1, bytes[(i - start) as usize].into()) {
+                Ok(_) =>{},
+                Err(_) => {
+                    return Ok(());
+                }
+            };
+        }
+        return Ok(());
+    }
+
     fn print_mem_area(&mut self, address: u32) {
         self.memory.print_mem_area(address);
     }
@@ -1947,71 +1959,10 @@ impl fmt::Display for Board {
     }
 }
 
-// fn locate_elf_file() -> Option<std::path::PathBuf> {
-//     let args: Vec<OsString> = env::args_os().collect();
-//     if args.len() >= 2 {
-//         return Some(PathBuf::from(args[1].clone()));
-//     }
-//
-//     let mut project_kind: Option<String> = None;
-//     let working = std::env::current_dir().expect("cannot find or access working directory");
-//     for dir in working.read_dir().expect("cannot read working directory") {
-//         match dir {
-//             Ok(dir) => {
-//                 let file_name = dir.file_name();
-//                 if file_name == ".pio" || file_name == ".pioenvs" {
-//                     project_kind = Some(file_name.into_string().unwrap());
-//                     break;
-//                 }
-//             }
-//             Err(_) => {}
-//         }
-//     }
-//
-//     return match project_kind {
-//         Some(s) => {
-//             let elf_path: std::path::PathBuf = if s == ".pio" {
-//                 [".pio", "build", "disco_l476vg", "firmware.elf"].iter().collect()
-//             } else {
-//                 [".pioenvs", "disco_l476vg", "firmware.elf"].iter().collect()
-//             };
-//             Some(working.join(elf_path))
-//         }
-//         None => None
-//     }
-// }
-
 mod server;
 use server::start_server;
 
 fn main() {
+    println!("started program");
     start_server();
-
-    // let path = match locate_elf_file() {
-    //     Some(p) => p,
-    //     None => {
-    //         println!("Cannot detect ELF file");
-    //         return;
-    //     }
-    // };
-    //
-    // let mut board = Board::new();
-    // board.load_elf_from_path(&path).unwrap();
-    // println!("\n{}\n", board);
-    // println!("finished init");
-    // board.spawn_audio();
-    //
-    //
-    //
-    // // while board.cpu.read_instruction_pc() != 0x080f2f60 {
-    // //     board.step().unwrap();
-    // // }
-    //
-    // loop {
-    //     board.step().unwrap();
-    //     println!("\n{}\n", board);
-    //     write!(stdout, "Press enter to continue...").unwrap();
-    //     stdout.flush().unwrap();
-    //     let _ = stdin.read(&mut [0u8]).unwrap();
-    // }
 }
