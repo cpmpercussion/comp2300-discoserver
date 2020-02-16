@@ -32,7 +32,7 @@ impl AudioHandler {
 
     pub fn spawn_audio(&mut self) {
         let target_freq = 48_000;
-        let (tx_data, rx_data) = sync_channel::<i16>(6);
+        let (tx_data, rx_data) = sync_channel::<i16>(32); // board uses ~6
         let (tx_confirm, rx_confirm) = sync_channel::<bool>(1);
 
         thread::spawn(move || {

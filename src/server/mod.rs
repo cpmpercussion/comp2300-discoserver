@@ -133,7 +133,7 @@ impl GdbServer {
     fn handle_client(stream: TcpStream) {
         let mut server = GdbServer::new(stream, 2048);
 
-        if let Err(e) = server.run(false) {
+        if let Err(e) = server.run(get_audio_from_argv()) {
             println!("server error: {:?}", e);
         };
     }
@@ -718,6 +718,16 @@ fn get_elf_file_path_from_argv() -> Option<PathBuf> {
         }
     }
     return None;
+}
+
+fn get_audio_from_argv() -> bool {
+    let mut args = env::args();
+    while let Some(arg) = args.next() {
+        if arg == "-a" || arg == "--audio" {
+            return true;
+        }
+    }
+    return false;
 }
 
 fn parse_read_memory(mut data: &[u8]) -> Result<(u32, u32), ()> {
