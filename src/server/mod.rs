@@ -241,6 +241,8 @@ impl GdbServer {
                         vals += &word_to_hex(rval.swap_bytes());
                     }
                     vals += &word_to_hex(self.board.cpu.read_instruction_pc().swap_bytes());
+                    vals += &word_to_hex(self.board.cpu.read_xpsr().swap_bytes());
+
                     self.send_reply(vals.as_bytes());
                 }
                 Request::ReadRegister { number } => {
