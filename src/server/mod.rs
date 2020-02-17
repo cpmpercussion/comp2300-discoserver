@@ -505,7 +505,7 @@ impl GdbServer {
         }
     }
 
-    fn parse_write_address(&mut self, mut packet: &[u8]) -> Result<Request, ()> {
+    fn parse_write_address(&mut self, packet: &[u8]) -> Result<Request, ()> {
         return Ok(Request::WriteMemory {
             address: 0,
             length: 0,
