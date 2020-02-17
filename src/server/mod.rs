@@ -131,7 +131,7 @@ impl GdbServer {
     }
 
     fn handle_client(stream: TcpStream) {
-        let mut server = GdbServer::new(stream, 2048);
+        let mut server = GdbServer::new(stream, 4096);
 
         if let Err(e) = server.run(get_audio_from_argv()) {
             println!("server error: {:?}", e);
@@ -249,11 +249,11 @@ impl GdbServer {
                     let value = match number {
                         0..=14u32 => self.board.read_reg(number),
                         15u32 => self.board.cpu.read_instruction_pc(),
-                        16..=23u32 => 0xDEADBEEF, // F0..7 probably
                         25u32 => self.board.cpu.read_xpsr(),
                         _ => {
-                            println!("Unknown register number");
-                            0x0
+                            println!("Unknown register number: {}", number);
+                            self.send_reply(b"1111112211111144");
+                            continue;
                         }
                     };
                     self.send_reply(word_to_hex(value.swap_bytes()).as_bytes());
@@ -279,10 +279,15 @@ impl GdbServer {
                         }
                         Query::ExecCommand { command } => {
                             match command.as_slice() {
-                                b"reset halt" => {
-                                    println!("restart not supported");
-                                    self.send_reply_empty();
-                                }
+                                // Platformio needs these to work when using
+                                // its default init script.
+                                // b"reset halt" => {
+                                //     println!("restart not supported");
+                                //     self.send_reply_ok();
+                                // }
+                                // b"init" => {
+                                //     self.send_reply_ok();
+                                // }
                                 _ => {
                                     println!("unknown command: {:?}", std::str::from_utf8(&command));
                                     self.send_reply_empty();
@@ -501,23 +506,32 @@ impl GdbServer {
     }
 
     fn parse_write_address(&mut self, mut packet: &[u8]) -> Result<Request, ()> {
-        assert!(packet[0] == b'M');
-        println!("parsing write address");
-        packet = &packet[1..];
-        let mut iter = packet.split(|&c| c == b',' || c == b':');
-        match (iter.next(), iter.next(), iter.next(), iter.next()) {
-            (Some(a), Some(l), Some(b), None) => {
-                return Ok(Request::WriteMemory {
-                    address: hex_to_word(a)?,
-                    length: hex_to_word(l)?,
-                    bytes: parse_hex_bytes(b)?,
-                });
-            }
-            _ => {
-                println!("invalid write memory instruction");
-                return Err(());
-            }
-        }
+        return Ok(Request::WriteMemory {
+            address: 0,
+            length: 0,
+            bytes: Vec::new(),
+        });
+
+        // BUG: It seemed to stall when we actually changed a lot of memory.
+        //      workaround by not doing it, because we already loaded the
+        //      board contents.
+        // assert!(packet[0] == b'M');
+        // println!("parsing write address");
+        // packet = &packet[1..];
+        // let mut iter = packet.split(|&c| c == b',' || c == b':');
+        // match (iter.next(), iter.next(), iter.next(), iter.next()) {
+        //     (Some(a), Some(l), Some(b), None) => {
+        //         return Ok(Request::WriteMemory {
+        //             address: hex_to_word(a)?,
+        //             length: hex_to_word(l)?,
+        //             bytes: parse_hex_bytes(b)?,
+        //         });
+        //     }
+        //     _ => {
+        //         println!("invalid write memory instruction");
+        //         return Err(());
+        //     }
+        // }
     }
 
     fn parse_read_register(&mut self, mut packet: &[u8]) -> Result<Request, ()> {
@@ -610,7 +624,6 @@ impl GdbServer {
 
     fn parse_v_packet(&mut self, mut packet: &[u8]) -> Result<Request, ()> {
         assert!(packet[0] == b'v');
-        // println!("parsing v packet");
         packet = &packet[1..];
         let command = leading_alpha(&packet);
         println!("handling {:?}", command);
@@ -644,7 +657,12 @@ impl GdbServer {
                 return Err(());
             }
         };
-        println!("TCP: {:?}", std::str::from_utf8(self.tcp_buffer[..size].as_ref()));
+
+        if size <= 40 {
+            println!("TCP: {:?}", std::str::from_utf8(self.tcp_buffer[..size].as_ref()));
+        } else {
+            println!("TCP (trunc): {:?}", std::str::from_utf8(self.tcp_buffer[..10].as_ref()));
+        }
 
         if size == 0 {
             return Ok(());
@@ -744,7 +762,8 @@ fn get_audio_from_argv() -> bool {
 }
 
 fn parse_read_memory(mut data: &[u8]) -> Result<(u32, u32), ()> {
-    data = &data[1..]; // remove "m"
+    assert!(data[0] == b'm');
+    data = &data[1..];
     let mut parts = data.split(|c| *c == b',');
 
     let addr = parts.next().expect("cannot parse address of read memory");

@@ -46,15 +46,15 @@ cargo build
     framework = stm32cube
     build_flags = -g -O0
     debug_tool = custom
-    debug_port = localhost:50030; or whatever port you want. Fix the corresponding  debug_server arg if changed.
+    debug_port = localhost:50030; or whatever port you want. Fix the corresponding debug_server arg if changed.
     debug_server =
         /abs/path/to/project/.../comp2300-disco-emulator/target/debug/arm-emulator
         tcp::50030
         -kernel
-        /Users/benjamingray/gitlab/comp2300-2019-assignment-2/.pio/build/emulate/firmware.elf
+        /abs/path/to/project/.../.pio/build/emulate/firmware.elf
     debug_init_cmds =
-      target remote $DEBUG_PORT
-      b main
+        target remote $DEBUG_PORT
+        b main
     ```
 
 4. Select the `ARM Emulator Debug` (or `PIO Debug` if platformio) option in the debug selection and use it like normal.
