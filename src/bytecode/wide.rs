@@ -631,6 +631,7 @@ fn id_load_half_word(word: u32, c: Context) -> ByteInstruction {
     return tag::get_undefined_wide(c, word);
 }
 
+// imm12 -> negate and mask to imm13
 fn get_negated_simm13(imm12: u32) -> u32 {
     return (!(imm12 & 0xFFF) + 1) & 0x1FFF;
 }

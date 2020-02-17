@@ -417,7 +417,13 @@ impl Board {
 
     fn execute_wide(&mut self, opcode: Opcode, data: u32, extra: u32) -> Result<(), String> {
         match opcode {
+            Opcode::AdcImm => self.w_adc_imm(data, extra),
+            Opcode::AdcReg => self.w_adc_reg(data, extra),
             Opcode::AddImm => self.w_add_imm(data, extra),
+            Opcode::AddReg => self.w_add_reg(data, extra),
+            Opcode::AddSpImm => panic!(),
+            Opcode::AddSpReg => panic!(),
+            Opcode::Adr    => self.w_adr(data, extra),
             Opcode::AndImm => self.w_and_imm(data, extra),
             Opcode::Bl     => self.w_bl(data, extra),
             Opcode::CmpImm => self.w_cmp_imm(data, extra),
@@ -443,7 +449,6 @@ impl Board {
 
     fn execute_narrow(&mut self, opcode: Opcode, data: u32) -> Result<(), String> {
         match opcode {
-            Opcode::AdcImm => self.n_adc_imm(data),
             Opcode::AdcReg => self.n_adc_reg(data),
             Opcode::AddImm => self.n_add_imm(data),
             Opcode::AddReg => self.n_add_reg(data),
@@ -668,16 +673,16 @@ impl Board {
         self.cpu.inc_pc(wide);
     }
 
-    fn get_shifted_register(&self, reg: u32, shift_t: u32, shift_n: u32) -> u32 {
-        return shift(self.read_reg(reg), shift_t, shift_n, self.cpu.read_carry_flag() as u32);
+    fn get_shifted_register(&self, reg_val: u32, shift_t: u32, shift_n: u32) -> u32 {
+        return shift(reg_val, shift_t, shift_n, self.cpu.read_carry_flag() as u32);
     }
 
     fn get_shift_with_carry(&self, reg: u32, shift_t: u32, shift_n: u32) -> (u32, bool) {
         return shift_c(self.read_reg(reg), shift_t, shift_n, self.cpu.read_carry_flag() as u32);
     }
 
-    fn get_add_with_carry(&self, reg: u8, imm32: u32) -> (u32, bool, bool) {
-        return add_with_carry(self.read_reg(reg), imm32, self.cpu.read_carry_flag() as u32);
+    fn add_with_carry_w_c(&self, reg_val: u32, imm32: u32) -> (u32, bool, bool) {
+        return add_with_carry(reg_val, imm32, u32::from(self.cpu.read_carry_flag()));
     }
 
     fn get_add_with_no_carry(&self, reg: u8, imm32: u32) -> (u32, bool, bool) {
@@ -777,9 +782,16 @@ impl Board {
      * Instruction handlers
      */
 
-    fn n_adc_imm(&mut self, data: u32) {
+    fn w_adc_imm(&mut self, data: u32, extra: u32) {
         // A7.7.1
-        println!("TODO: ADC (imm) narrow");
+        let imm32 = data << 30 | extra;
+        let rd = (data >> 4) & 0xF;
+        let rn = (data >> 8) & 0xF;
+        let (result, carry, overflow) = self.add_with_carry_w_c(self.read_reg(rn), imm32);
+        self.write_reg(rd, result);
+        if bitset(data, 12) {
+            self.set_flags_nzcv(result, carry, overflow);
+        }
     }
 
     fn n_adc_reg(&mut self, data: u32) {
@@ -789,6 +801,22 @@ impl Board {
         let (result, carry, overflow) = add_with_carry(self.read_reg(rd), self.read_reg(rm), self.cpu.carry());
         self.write_reg(rd, result);
         if !self.in_it_block() {
+            self.set_flags_nzcv(result, carry, overflow);
+        }
+    }
+
+    fn w_adc_reg(&mut self, data: u32, extra: u32) {
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let rm = (data >> 8) & 0xF;
+        let setflags = bitset(data, 12);
+        let shift_t = extra & 0b11;
+        let shift_n = extra >> 2;
+
+        let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
+        let (result, carry, overflow) = self.add_with_carry_w_c(self.read_reg(rn), shifted);
+        self.write_reg(rd, result);
+        if setflags {
             self.set_flags_nzcv(result, carry, overflow);
         }
     }
@@ -833,6 +861,27 @@ impl Board {
         }
     }
 
+    fn w_add_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.4
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let rm = (data >> 8) & 0xF;
+        let setflags = bitset(data, 12);
+        let shift_t = extra & 0b11;
+        let shift_n = extra >> 2;
+
+        let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
+        let (result, carry, overflow) = add_with_carry(self.read_reg(rn), shifted, 0);
+        if rd == 15 {
+            self.alu_write_pc(result);
+        } else {
+            self.write_reg(rd, result);
+            if setflags {
+                self.set_flags_nzcv(result, carry, overflow);
+            }
+        }
+    }
+
     fn n_add_sp_imm(&mut self, data: u32) {
         // A7.7.5
         let imm10 = data & 0x3FF;
@@ -851,7 +900,7 @@ impl Board {
 
     fn add_sp_reg(&mut self, rd: u8, rm: u8, shift: Shift, setflags: bool) {
         // A7.7.6
-        // let shifted = self.get_shifted_register(rm, shift);
+        // let shifted = self.get_shifted_register(self.read_reg(rm), shift);
         // let (result, carry, overflow) = add_with_carry(self.read_sp(), shifted, 0);
         // if rd == 15 {
         //     self.alu_write_pc(result);
@@ -867,6 +916,13 @@ impl Board {
         let imm10 = data & 0x3FF;
         let rd = data >> 10;
         let result = word_align(self.read_pc()).wrapping_add(imm10);
+        self.write_reg(rd, result);
+    }
+
+    fn w_adr(&mut self, data: u32, extra: u32) {
+        let rd = data;
+        let imm32 = sign_extend(12, extra);
+        let result = word_align(self.read_pc()).wrapping_add(imm32);
         self.write_reg(rd, result);
     }
 
@@ -1757,7 +1813,7 @@ impl Board {
         let shift_t = extra >> 6;
         let shift_n = extra & 0x3F;
 
-        let shifted = self.get_shifted_register(rm, shift_t, shift_n);
+        let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
         let (result, carry, overflow) = add_with_carry(self.read_reg(rn), !shifted, 1);
         self.write_reg(rd, result);
         if setflags {
