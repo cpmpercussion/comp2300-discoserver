@@ -14,7 +14,7 @@ cargo --version
 cargo build
 ```
 
-3. Follow one of the following to use this to debug a discoboard project. Make sure to use the correct paths instead of the placeholders. Newer versions of platformio use `.pio/build` instead of `.pioenvs`. Change `debug` to `release` in the emulator path if you want to use a release build made with `cargo build --release` (use this if you want the best performance, such as when testing audio).
+3. Follow one of the following to use this to debug a discoboard project. Make sure to use the correct paths instead of the placeholders. Change `debug` to `release` in the emulator path if you want to use a release build made with `cargo build --release` (use this if you want the best performance, such as when testing audio).
 
     1. If using `cortex-debug` to debug, add the following to `.vscode/launch.json` configurations.
 
@@ -25,10 +25,10 @@ cargo build
         "name": "ARM Emulator Debug",
         "cwd": "${workspaceRoot}",
         "device": "STM32L476vg",
-        "executable": "${workspaceRoot}/.pioenvs/disco_l476vg/firmware.elf",
+        "executable": "${workspaceRoot}/.pio/build/disco_l476vg/firmware.elf",
         "servertype": "qemu",
         "preLaunchTask": "PlatformIO: Build",
-        "serverpath": "/abs/path/to/project/.../comp2300-disco-emulator/target/debug/arm-emulator",
+        "serverpath": "/abs/path/to/comp2300-disco-emulator/target/debug/arm-emulator",
         "postLaunchCommands": [
             "-break-insert main"
         ]
@@ -48,10 +48,10 @@ cargo build
     debug_tool = custom
     debug_port = localhost:50030; or whatever port you want. Fix the corresponding debug_server arg if changed.
     debug_server =
-        /abs/path/to/project/.../comp2300-disco-emulator/target/debug/arm-emulator
+        /abs/path/to/comp2300-disco-emulator/target/debug/arm-emulator
         tcp::50030
         -kernel
-        /abs/path/to/project/.../.pio/build/emulate/firmware.elf
+        /abs/path/to/project/.pio/build/emulate/firmware.elf
     debug_init_cmds =
         target remote $DEBUG_PORT
         b main
