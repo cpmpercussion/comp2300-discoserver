@@ -7,4 +7,3 @@ edition = "2018"
 [dependencies]
 goblin = "0.0.22" # ELF parsing
 cpal = "0.10.0" # sound
-hex = "0.4.1"
