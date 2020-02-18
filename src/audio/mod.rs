@@ -112,7 +112,7 @@ fn get_audio_config(freq: u32, host: &cpal::Host, event_loop: &cpal::EventLoop) 
     let required_freq = cpal::SampleRate(freq);
     for supported in formats {
         println!("F= channels: {:?}, min: {:?}, max: {:?}, data: {:?}", supported.channels, supported.min_sample_rate, supported.max_sample_rate, supported.data_type);
-        if supported.min_sample_rate < required_freq || supported.max_sample_rate > required_freq {
+        if supported.min_sample_rate > required_freq || supported.max_sample_rate < required_freq {
             continue;
         }
 

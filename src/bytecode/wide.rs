@@ -77,6 +77,7 @@ fn id_data_processing_shifted_register(word: u32, c: Context) -> ByteInstruction
 
     let shift_t = (word >> 4) & 0b11;
     let mut shift_n = (word >> 6) & 0b11 | (word & (0b111 << 12)) >> 10;
+    // A7.4.2 DecodeImmShift special handling for ASR and LSR
     if shift_n == 0 && (shift_t == 0b01 || shift_t == 0b10) {
         shift_n = 32;
     }
