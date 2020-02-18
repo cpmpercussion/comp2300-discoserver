@@ -454,12 +454,24 @@ impl Board {
             Opcode::OrrReg => self.w_orr_reg(data, extra),
             Opcode::Pkhbt  => self.w_pkhbt(data, extra),
             Opcode::Pop    => self.w_pop(data, extra),
+            Opcode::RorImm => self.w_ror_imm(data, extra),
+            Opcode::Rrx    => self.w_rrx(data, extra),
             Opcode::RsbImm => self.w_rsb_imm(data, extra),
+            Opcode::RsbReg => self.w_rsb_reg(data, extra),
+            Opcode::SbcImm => self.w_sbc_imm(data, extra),
+            Opcode::SbcReg => self.w_sbc_reg(data, extra),
+            Opcode::Sdiv   => self.w_sdiv(data, extra),
+            Opcode::Smull  => self.w_smull(data, extra),
             Opcode::Stm    => self.w_stm(data, extra),
             Opcode::StrImm => self.w_str_imm(data, extra),
             Opcode::SubImm => self.w_sub_imm(data, extra),
             Opcode::SubReg => self.w_sub_reg(data, extra),
+            Opcode::TeqImm => self.w_teq_imm(data, extra),
+            Opcode::TeqReg => self.w_teq_reg(data, extra),
+            Opcode::TstImm => self.w_tst_imm(data, extra),
+            Opcode::TstReg => self.w_tst_reg(data, extra),
             Opcode::Udiv   => self.w_udiv(data, extra),
+            Opcode::Umull  => self.w_umull(data, extra),
             _ => {
                 // unsafe { unreachable_unchecked() }
                 println!("Unimplemented wide instruction {:?} : {:#06X} + {:#010X}", opcode, data, extra);
@@ -1952,14 +1964,43 @@ impl Board {
         self.write_reg(rd, result);
     }
 
+    fn w_ror_imm(&mut self, data: u32, extra: u32) {
+        // A7.7.116
+        let rd = data & 0xF;
+        let rm = (data >> 4) & 0xF;
+        let setflags = bitset(data, 8);
+        let shift_n = extra;
+
+        let (result, carry) = bits::ror_c(self.read_reg(rm), shift_n);
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nzc(result, carry);
+        }
+    }
+
     fn n_ror_reg(&mut self, data: u32) {
         // A7.7.117
         let rdn = data & 0x7;
         let rm = data >> 3;
+
         let shift = self.read_reg(rm) & 0xFF;
         let (result, carry) = bits::ror_c(self.read_reg(rdn), shift);
         self.write_reg(rdn, result);
         if !self.in_it_block() {
+            self.set_flags_nzc(result, carry);
+        }
+    }
+
+    fn w_rrx(&mut self, data: u32, extra: u32) {
+        // A7.7.118
+        let rd = data & 0xF;
+        let rm = (data >> 4) & 0xF;
+        let setflags = bitset(data, 8);
+        let shift_n = extra;
+
+        let (result, carry) = bits::rrx_c(self.read_reg(rm), self.cpu.read_carry_flag() as u32);
+        self.write_reg(rd, result);
+        if setflags {
             self.set_flags_nzc(result, carry);
         }
     }
@@ -1985,6 +2026,37 @@ impl Board {
         }
     }
 
+    fn w_rsb_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.120
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let rm = (data >> 8) & 0xF;
+        let setflags = bitset(data, 12);
+        let shift_n = extra >> 2;
+        let shift_t = extra & 0b11;
+
+        let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
+        let (result, carry, overflow) = add_with_carry(!self.read_reg(rn), shifted, 1);
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nzcv(result, carry, overflow);
+        }
+    }
+
+    fn w_sbc_imm(&mut self, data: u32, extra: u32) {
+        // A7.7.124
+        let imm32 = data << 30 | extra;
+        let rd = (data >> 4) & 0xF;
+        let rn = (data >> 8) & 0xF;
+        let setflags = bitset(data, 12);
+
+        let (result, carry, overflow) = self.add_with_carry_w_c(self.read_reg(rn), !imm32);
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nzcv(result, carry, overflow);
+        }
+    }
+
     fn n_sbc_reg(&mut self, data: u32) {
         // A7.7.125
         let rdn = data & 0b111;
@@ -1994,6 +2066,58 @@ impl Board {
         if !self.in_it_block() {
             self.set_flags_nzcv(result, carry, overflow);
         }
+    }
+
+    fn w_sbc_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.125
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let rm = (data >> 8) & 0xF;
+        let setflags = bitset(data, 12);
+        let shift_n = extra >> 2;
+        let shift_t = extra & 0b11;
+
+        let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
+        let (result, carry, overflow) = self.add_with_carry_w_c(self.read_reg(rn), !shifted);
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nzcv(result, carry, overflow);
+        }
+    }
+
+    fn w_sdiv(&mut self, data: u32, extra: u32) {
+        // A7.7.127
+        let rd = data & 0xF;
+        let rn = data >> 4;
+        let rm = extra;
+
+        let rm_val = self.read_reg(rm) as i32;
+        let result = if rm_val == 0 {
+            if /*IntegerZeroDivideTrappingEnabled*/ false {
+                // GenerateIntegerZeroDivide();
+                0
+            } else {
+                0
+            }
+        } else {
+            (self.read_reg(rn) as i32).wrapping_div(rm_val)
+        } as u32;
+
+        self.write_reg(rd, result);
+    }
+
+    fn w_smull(&mut self, data: u32, extra: u32) {
+        // A7.7.149
+        let rn = data & 0xF;
+        let rm = data >> 4;
+        let rd_lo = extra & 0xF;
+        let rd_hi = extra >> 4;
+
+        let rn_val = self.read_reg(rn) as i64;
+        let rm_val = self.read_reg(rm) as i64;
+        let result = rn_val * rm_val;
+        self.write_reg(rd_lo, (result & 0xFFFF_FFFF) as u32);
+        self.write_reg(rd_hi, (result >> 32) as u32);
     }
 
     fn n_stm(&mut self, data: u32) {
@@ -2176,12 +2300,54 @@ impl Board {
         self.write_reg(rd, result);
     }
 
+    fn w_teq_imm(&mut self, data: u32, extra: u32) {
+        // A7.7.186
+        let imm32 = data << 30 | extra;
+        let rn = data >> 4;
+
+        let result = self.read_reg(rn) ^ imm32;
+        self.set_flags_nz_alt_c(result, data);
+    }
+
+    fn w_teq_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.187
+        let rn = data & 0xF;
+        let rm = data >> 4;
+        let shift_n = extra >> 2;
+        let shift_t = extra & 0b11;
+
+        let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
+        let result = self.read_reg(rn) ^ shifted;
+        self.set_flags_nzc(result, carry);
+    }
+
+    fn w_tst_imm(&mut self, data: u32, extra: u32) {
+        // A7.7.188
+        let imm32 = data << 30 | extra;
+        let rn = data >> 4;
+
+        let result = self.read_reg(rn) & imm32;
+        self.set_flags_nz_alt_c(result, data);
+    }
+
     fn n_tst_reg(&mut self, data: u32) {
         // A7.7.189
         let rn = data & 0x7;
         let rm = data >> 3;
         let result = self.read_reg(rn) & self.read_reg(rm);
         self.set_flags_nz(result);
+    }
+
+    fn w_tst_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.189
+        let rn = data & 0xF;
+        let rm = data >> 4;
+        let shift_n = extra >> 2;
+        let shift_t = extra & 0b11;
+
+        let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
+        let result = self.read_reg(rn) & shifted;
+        self.set_flags_nzc(result, carry);
     }
 
     fn n_udf(&mut self, data: u32) {
@@ -2205,6 +2371,20 @@ impl Board {
             self.read_reg(rn) / m
         };
         self.write_reg(rd, result);
+    }
+
+    fn w_umull(&mut self, data: u32, extra: u32) {
+        // A7.7.204
+        let rn = data & 0xF;
+        let rm = data >> 4;
+        let rd_lo = extra & 0xF;
+        let rd_hi = extra >> 4;
+
+        let rn_val = self.read_reg(rn) as u64;
+        let rm_val = self.read_reg(rm) as u64;
+        let result = rn_val * rm_val;
+        self.write_reg(rd_lo, (result & 0xFFFF_FFFF) as u32);
+        self.write_reg(rd_hi, (result >> 32) as u32);
     }
 
     fn n_uxtb(&mut self, data: u32) {

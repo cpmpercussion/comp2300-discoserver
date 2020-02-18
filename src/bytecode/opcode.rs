@@ -3,7 +3,7 @@
 pub enum Opcode {
     Unimplemented, // N: orginal thumb[16], W: blank[16] - original thumb[32]
     AdcImm, // W: blank[3]-setflags[1]-rn[4]-rd[4]-spill[4] + modified[30]
-    AdcReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[3]-setflags[1]-
+    AdcReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[22]-shift_n[6]-shift_t[2]
     AddImm, // N: blank[2]-rn[3]-rd[3]-imm8[8] / W: blank[3]-setflags[1]-rn[4]-rd[4]-spill[4] + modified[30]
     AddReg, // N: blank[3]-setflags[1]-rn[4]-rm[4]-rd[4] / W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[22]-shift_n[6]-shift_t[2]
     AddSpImm, // N: blank[2]-rd[4]-offset[10]
@@ -65,12 +65,12 @@ pub enum Opcode {
     RorReg, // N: blank[10]-rm[3]-rdn[3]
     Rrx,
     RsbImm, // N: blank[12]-rn[3]-rd[3]
-    RsbReg,
+    RsbReg, // W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[22]-shift_n[6]-shift_t[2]
     SbcImm, // W: blank[3]-setflags[1]-rn[4]-rd[4]-spill[4] + modified[30]
-    SbcReg, // N: blank[10]-rm[3]-rdn[3]
-    Sdiv,
+    SbcReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[22]-shift_n[6]-shift_t[2]
+    Sdiv, // W: blank[8]-rn[4]-rd[4] + blank[26]-rm[4]
     Sev,
-    Smull,
+    Smull, // W: blank[8]-rm[4]-rn[4] + blank[22]-rd_hi[4]-rd_lo[4]
     Stm,    // N: blank[5]-rt[3]-registers[8] / W: blank[12]-rn[4] + blank[13]-wback[1]-(pc)[1]-lr[1]-(sp)[1]-registers[13]
     StrImm, // N: rn[4]-rt[4]-imm8[8] / W: blank[8]-rn[4]-rt[4] + blank[15]-index[1]-wback[1]-imm13[13]
     StrReg, // N: blank[7]-rm[3]-rn[3]-rt[3]
@@ -85,12 +85,12 @@ pub enum Opcode {
     Sxtb,   // N: blank[12]-rm[3]-rd[3]
     Sxth,   // N: blank[12]-rm[3]-rd[3]
     TeqImm, // W: blank[8]-rn[4]-spill[4] + modified[30]
-    TeqReg,
+    TeqReg, // W: blank[8]-rm[4]-rn[4] + blank[22]-shift_n[6]-shift_t[2]
     TstImm, // W: blank[8]-rn[4]-spill[4] + modified[30]
-    TstReg, // N: blank[12]-rm[3]-rn[3]
+    TstReg, // N: blank[12]-rm[3]-rn[3] / W: blank[8]-rm[4]-rn[4] + blank[22]-shift_n[6]-shift_t[2]
     Udf,    // N: blank[8]-imm8[8]
     Udiv,
-    Umull,
+    Umull,  // W: blank[8]-rm[4]-rn[4] + blank[22]-rd_hi[4]-rd_lo[4]
     Uxtb,   // N: blank[12]-rm[3]-rd[3]
     Uxth,   // N: blank[12]-rm[3]-rd[3]
     Wfe,
