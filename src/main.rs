@@ -439,8 +439,12 @@ impl Board {
             Opcode::Ldm    => self.w_ldm(data, extra),
             Opcode::LdrImm => self.w_ldr_imm(data, extra),
             Opcode::LdrLit => self.w_ldr_lit(data, extra),
+            Opcode::LdrReg => self.w_ldr_reg(data, extra),
             Opcode::LslImm => self.w_lsl_imm(data, extra),
+            Opcode::LsrImm => self.w_lsr_imm(data, extra),
             Opcode::MovImm => self.w_mov_imm(data, extra),
+            Opcode::MovReg => self.w_mov_reg(data, extra),
+            Opcode::Movt   => self.w_movt(data, extra),
             Opcode::Mul    => self.w_mul(data, extra),
             Opcode::RsbImm => self.w_rsb_imm(data, extra),
             Opcode::Stm    => self.w_stm(data, extra),
@@ -1416,6 +1420,28 @@ impl Board {
         self.write_reg(rt, value);
     }
 
+    fn w_ldr_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.45
+        let rt = data & 0xF;
+        let rn = data >> 4;
+        let rm = extra & 0xF;
+        let shift_n = extra >> 4;
+
+        let (offset, _) = bits::lsl_c(self.read_reg(rm), shift_n);
+
+        // NOTE: Manual does not define `add`, `index`, or `wback` so we just assume it matches T1
+        let address = self.read_reg(rn).wrapping_add(offset);
+        let value = self.memory.read_mem_u(address, 4).expect(format!("could not read memory at {}", address).as_str());
+        if rt == 15 {
+            if address & 0b11 != 0 {
+                println!("UNPREDICTABLE: ldr.W");
+            }
+            self.load_write_pc(value);
+        } else {
+            self.write_reg(rt, value);
+        }
+    }
+
     fn n_ldrb_imm(&mut self, data: u32) {
         // A7.7.46
         let rt = data & 0x7;
@@ -1549,13 +1575,12 @@ impl Board {
         let rd = data & 0xF;
         let rm = (data >> 4) & 0xF;
         let setflags = bitset(data, 8);
-        let shift = extra;
-        let input = self.read_reg(rm);
-        let result = input << shift;
-        let carry_out = bitset(input, 32 - shift);
+        let shift_n = extra;
+
+        let (result, carry) = bits::lsl_c(self.read_reg(rm), shift_n);
         self.write_reg(rd, result);
         if setflags {
-            self.set_flags_nzc(result, carry_out);
+            self.set_flags_nzc(result, carry);
         }
     }
 
@@ -1579,6 +1604,20 @@ impl Board {
         let (result, carry) = bits::lsr_c(self.read_reg(rm), shift);
         self.write_reg(rd, result);
         if !self.in_it_block() {
+            self.set_flags_nzc(result, carry);
+        }
+    }
+
+    fn w_lsr_imm(&mut self, data: u32, extra: u32) {
+        // A7.7.70
+        let rd = data & 0xF;
+        let rm = (data >> 4) & 0xF;
+        let setflags = bitset(data, 8);
+        let shift_n = extra;
+
+        let (result, carry) = bits::lsr_c(self.read_reg(rm), shift_n);
+        self.write_reg(rd, result);
+        if setflags {
             self.set_flags_nzc(result, carry);
         }
     }
@@ -1619,15 +1658,44 @@ impl Board {
         // A7.7.77
         let rd = data & 0xF;
         let rm = (data >> 4) & 0xF;
+        let setflags = bitset(data, 8);
+
         let result = self.read_reg(rm);
         if rd == 15 {
             self.alu_write_pc(result);
         } else {
             self.write_reg(rd, result);
-            if bitset(data, 8) {
+            if setflags {
                 self.set_flags_nz(result);
             }
         }
+    }
+
+    fn w_mov_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.77
+        let rd = data & 0xF;
+        let setflags = bitset(data, 4);
+        let rm = extra;
+
+        let result = self.read_reg(rm);
+        if rd == 15 {
+            self.alu_write_pc(result);
+        } else {
+            self.write_reg(rd, result);
+            if setflags {
+                self.set_flags_nz(result);
+            }
+        }
+    }
+
+    fn w_movt(&mut self, data: u32, extra: u32) {
+        // A7.7.79
+        let rd = data;
+        let imm16 = extra;
+
+        let original = self.read_reg(rd);
+        let modified = imm16 << 16 | (original & 0xFFFF);
+        self.write_reg(rd, modified);
     }
 
     fn n_mul(&mut self, data: u32) {

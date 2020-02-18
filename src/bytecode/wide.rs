@@ -359,7 +359,7 @@ fn id_data_proc_plain_binary_immediate(word: u32, c: Context) -> ByteInstruction
             }
         }
         0b01100 => {
-            let base = tag::get_wide(Opcode::Movt, c, rd, (word & (0xF << 16)) >> 4 | imm12); // A7.7.76 T3
+            let base = tag::get_wide(Opcode::Movt, c, rd, (word & (0xF << 16)) >> 4 | imm12); // A7.7.79 T1
             if rd == 13 || rd == 15 {
                 tag::as_unpred_w(base)
             } else {

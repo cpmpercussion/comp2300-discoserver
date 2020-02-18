@@ -40,7 +40,7 @@ pub enum Opcode {
     LdrhReg, // N: blank[7]-rm[3]-rn[3]-rt[3]
     LdrsbReg, // N: blank[7]-rm[3]-rn[3]-rt[3]
     LdrshReg, // N: blank[7]-rm[3]-rn[3]-rt[3]
-    LslImm, // N: blank[5]-shift[5]-rm[3]-rd[3]
+    LslImm, // N: blank[5]-shift[5]-rm[3]-rd[3] / W: blank[7]-setflags[1]-rm[4]-rd[4] + blank[25]-shift_n[5]
     LslReg, // N: blank[10]-rm[3]-rdn[3]
     LsrImm, // N: blank[5]-shift[5]-rm[3]-rd[3]
     LsrReg, // N: blank[10]-rm[3]-rdn[3]
