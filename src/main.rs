@@ -425,8 +425,17 @@ impl Board {
             Opcode::AddSpReg => panic!(),
             Opcode::Adr    => self.w_adr(data, extra),
             Opcode::AndImm => self.w_and_imm(data, extra),
+            Opcode::AndReg => self.w_and_reg(data, extra),
+            Opcode::AsrImm => self.w_asr_imm(data, extra),
+            Opcode::BicImm => self.w_bic_imm(data, extra),
+            Opcode::BicReg => self.w_bic_reg(data, extra),
             Opcode::Bl     => self.w_bl(data, extra),
+            Opcode::CmnImm => self.w_cmn_imm(data, extra),
+            Opcode::CmnReg => self.w_cmn_reg(data, extra),
             Opcode::CmpImm => self.w_cmp_imm(data, extra),
+            Opcode::CmpReg => self.w_cmp_reg(data, extra),
+            Opcode::EorImm => self.w_eor_imm(data, extra),
+            Opcode::EorReg => self.w_eor_reg(data, extra),
             Opcode::Ldm    => self.w_ldm(data, extra),
             Opcode::LdrImm => self.w_ldr_imm(data, extra),
             Opcode::LdrLit => self.w_ldr_lit(data, extra),
@@ -677,16 +686,12 @@ impl Board {
         return shift(reg_val, shift_t, shift_n, self.cpu.read_carry_flag() as u32);
     }
 
-    fn get_shift_with_carry(&self, reg: u32, shift_t: u32, shift_n: u32) -> (u32, bool) {
-        return shift_c(self.read_reg(reg), shift_t, shift_n, self.cpu.read_carry_flag() as u32);
+    fn get_shift_with_carry(&self, reg_val: u32, shift_t: u32, shift_n: u32) -> (u32, bool) {
+        return shift_c(reg_val, shift_t, shift_n, self.cpu.read_carry_flag() as u32);
     }
 
     fn add_with_carry_w_c(&self, reg_val: u32, imm32: u32) -> (u32, bool, bool) {
         return add_with_carry(reg_val, imm32, u32::from(self.cpu.read_carry_flag()));
-    }
-
-    fn get_add_with_no_carry(&self, reg: u8, imm32: u32) -> (u32, bool, bool) {
-        return add_with_carry(self.read_reg(reg), imm32, 0);
     }
 
     fn set_flags_nz(&mut self, result: u32) {
@@ -949,14 +954,46 @@ impl Board {
         }
     }
 
+    fn w_and_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.9
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let rm = (data >> 8) & 0xF;
+        let setflags = bitset(data, 12);
+        let shift_t = extra & 0b11;
+        let shift_n = extra >> 2;
+
+        let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
+        let result = self.read_reg(rn) & shifted;
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nzc(result, carry);
+        }
+    }
+
     fn n_asr_imm(&mut self, data: u32) {
         // A7.7.10
         let rd = data & 0x7;
         let rm = (data >> 3) & 0x7;
-        let shift = data >> 6;
-        let (result, carry) = bits::asr_c(self.read_reg(rm), shift);
+        let shift_n = data >> 6;
+
+        let (result, carry) = bits::asr_c(self.read_reg(rm), shift_n);
         self.write_reg(rd, result);
         if !self.in_it_block() {
+            self.set_flags_nzc(result, carry);
+        }
+    }
+
+    fn w_asr_imm(&mut self, data: u32, extra: u32) {
+        // A7.7.10
+        let rd = data & 0xF;
+        let rm = (data >> 4) & 0xF;
+        let setflags = bitset(data, 8);
+        let shift_n = extra;
+
+        let (result, carry) = bits::asr_c(self.read_reg(rm), shift_n);
+        self.write_reg(rd, result);
+        if setflags {
             self.set_flags_nzc(result, carry);
         }
     }
@@ -965,6 +1002,7 @@ impl Board {
         // A7.7.11
         let rdn = data & 0x7;
         let rm = data >> 3;
+
         let shift = self.read_reg(rm) & 0xFF;
         let (result, carry) = bits::asr_c(self.read_reg(rdn), shift);
         if !self.in_it_block() {
@@ -987,16 +1025,18 @@ impl Board {
         }
     }
 
-    fn bfc(&mut self, rd: u8, mask: u32) {
-        // A7.7.13
-        // NOTE: We precalculate the mask from the msbit and lsbit values
-        self.write_reg(rd, self.read_reg(rd) & mask);
-    }
+    fn w_bic_imm(&mut self, data: u32, extra: u32) {
+        // A7.7.15
+        let imm32 = data << 30 | extra;
+        let rd = (data >> 4) & 0xF;
+        let rn = (data >> 8) & 0xF;
+        let setflags = bitset(data, 12);
 
-    fn bfi(&mut self, rd: u8, mask: u32) {
-        // A7.7.14
-        // NOTE: We precalculate the mask from the msbit and lsbit values.
-        self.write_reg(rd, self.read_reg(rd) | mask);
+        let result = self.read_reg(rn) & !imm32;
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nz_alt_c(result, data);
+        }
     }
 
     fn bic_imm(&mut self, rd: u8, rn: u8, imm32: u32, setflags: bool, carry: CarryChange) {
@@ -1011,6 +1051,23 @@ impl Board {
         self.write_reg(rdn, result);
         if !self.in_it_block() {
             self.set_flags_nz(result);
+        }
+    }
+
+    fn w_bic_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.16
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let rm = (data >> 8) & 0xF;
+        let setflags = bitset(data, 12);
+        let shift_t = extra & 0b11;
+        let shift_n = extra >> 2;
+
+        let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
+        let result = self.read_reg(rn) & !shifted;
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nzc(result, carry);
         }
     }
 
@@ -1078,9 +1135,12 @@ impl Board {
         self.write_reg(rd, self.read_reg(rm).leading_zeros());
     }
 
-    fn cmn_imm(&mut self, rn: u8, imm32: u32) {
+    fn w_cmn_imm(&mut self, data: u32, extra: u32) {
         // A7.7.25
-        let (result, carry, overflow) = self.get_add_with_no_carry(rn, imm32);
+        let imm32 = data << 30 | extra;
+        let rn = (data >> 4) & 0xF;
+
+        let (result, carry, overflow) = add_with_carry(self.read_reg(rn), imm32, 0);
         self.set_flags_nzcv(result, carry, overflow);
     }
 
@@ -1089,6 +1149,18 @@ impl Board {
         let rn = data & 0x7;
         let rm = data >> 3;
         let (result, carry, overflow) = add_with_carry(self.read_reg(rn), self.read_reg(rm), 0);
+        self.set_flags_nzcv(result, carry, overflow);
+    }
+
+    fn w_cmn_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.26
+        let rn = data & 0xF;
+        let rm = data >> 4;
+        let shift_n = extra >> 2;
+        let shift_t = extra & 0b11;
+
+        let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
+        let (result, carry, overflow) = add_with_carry(self.read_reg(rn), shifted, 0);
         self.set_flags_nzcv(result, carry, overflow);
     }
 
@@ -1112,6 +1184,18 @@ impl Board {
         let rn = data & 0xF;
         let rm = data >> 4;
         let (result, carry, overflow) = add_with_carry(self.read_reg(rn), !self.read_reg(rm), 1);
+        self.set_flags_nzcv(result, carry, overflow);
+    }
+
+    fn w_cmp_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.28
+        let rn = data & 0xF;
+        let rm = data >> 4;
+        let shift_n = extra >> 2;
+        let shift_t = extra & 0b11;
+
+        let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
+        let (result, carry, overflow) = add_with_carry(self.read_reg(rn), !shifted, 0);
         self.set_flags_nzcv(result, carry, overflow);
     }
 
@@ -1143,8 +1227,18 @@ impl Board {
         // TODO
     }
 
-    fn eor_imm(&mut self, rd: u8, rn: u8, imm32: u32, setflags: bool, carry: CarryChange) {
+    fn w_eor_imm(&mut self, data: u32, extra: u32) {
         // A7.7.35
+        let imm32 = data << 30 | extra;
+        let rd = (data >> 4) & 0xF;
+        let rn = (data >> 8) & 0xF;
+        let setflags = bitset(data, 12);
+
+        let result = self.read_reg(rn) ^ imm32;
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nz_alt_c(result, data);
+        }
     }
 
     fn n_eor_reg(&mut self, data: u32) {
@@ -1155,6 +1249,23 @@ impl Board {
         self.write_reg(rdn, result);
         if !self.in_it_block() {
             self.set_flags_nz(result);
+        }
+    }
+
+    fn w_eor_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.36
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let rm = (data >> 8) & 0xF;
+        let setflags = bitset(data, 12);
+        let shift_n = extra >> 2;
+        let shift_t = extra & 0b11;
+
+        let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
+        let result = self.read_reg(rn) ^ shifted;
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nzc(result, carry);
         }
     }
 
