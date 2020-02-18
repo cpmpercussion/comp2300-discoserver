@@ -347,6 +347,22 @@ impl Board {
         };
     }
 
+    fn step(&mut self) -> Result<(), String> {
+        match self.fetch() {
+            Ok((i, w)) => {
+                // println!("fetched {:?} ({})", tag::get_opcode(i.0), if w { "wide" } else { "narrow" });
+                return self.execute(i, w);
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        };
+    }
+
+    fn spawn_audio(&mut self) {
+        self.audio_handler.spawn_audio();
+    }
+
     /**
      * Fetch: This stage
      * 1. Retrieves the address of the instruction to be executed
@@ -927,20 +943,6 @@ impl Board {
         }
     }
 
-    fn add_sp_reg(&mut self, rd: u8, rm: u8, shift: Shift, setflags: bool) {
-        // A7.7.6
-        // let shifted = self.get_shifted_register(self.read_reg(rm), shift);
-        // let (result, carry, overflow) = add_with_carry(self.read_sp(), shifted, 0);
-        // if rd == 15 {
-        //     self.alu_write_pc(result);
-        // } else {
-        //     self.write_reg(rd, result);
-        //     if setflags {
-        //         self.set_flags_nzcv(result, carry, overflow);
-        //     }
-        // }
-    }
-
     fn n_adr(&mut self, data: u32) {
         let imm10 = data & 0x3FF;
         let rd = data >> 10;
@@ -1063,10 +1065,6 @@ impl Board {
         }
     }
 
-    fn bic_imm(&mut self, rd: u8, rn: u8, imm32: u32, setflags: bool, carry: CarryChange) {
-        // A7.7.15
-    }
-
     fn n_bic_reg(&mut self, data: u32) {
         // A7.7.16
         let rdn = data & 0x7;
@@ -1143,22 +1141,6 @@ impl Board {
         }
     }
 
-    fn cpd(&mut self, _cp: u8) {
-        // A7.7.22
-        // TODO: Coprocessor stuff
-        panic!("UsageFault");
-    }
-
-    fn clrex(&mut self) {
-        // A7.7.23
-        self.clear_exclusive_local(self.processor_id());
-    }
-
-    fn clz(&mut self, rd: u8, rm: u8) {
-        // A7.7.24
-        self.write_reg(rd, self.read_reg(rm).leading_zeros());
-    }
-
     fn w_cmn_imm(&mut self, data: u32, extra: u32) {
         // A7.7.25
         let imm32 = data << 30 | extra;
@@ -1231,26 +1213,6 @@ impl Board {
 
     // A7.7.30 is CPY, a deprecated alias for MOV
 
-    fn csdb(&mut self) {
-        // A7.7.31
-        // TODO
-    }
-
-    fn dbg(&mut self, _option: u8) {
-        // A7.7.32
-        // TODO
-    }
-
-    fn dmb(&mut self, _option: u8) {
-        // A7.7.33
-        // TODO
-    }
-
-    fn dsb(&mut self, _option: u8) {
-        // A7.7.34
-        // TODO
-    }
-
     fn w_eor_imm(&mut self, data: u32, extra: u32) {
         // A7.7.35
         let imm32 = data << 30 | extra;
@@ -1293,24 +1255,9 @@ impl Board {
         }
     }
 
-    fn isb(&mut self, _option: u8) {
-        // A7.7.37
-        // TODO
-    }
-
     fn n_it(&mut self, data: u32) {
         // A7.7.38
         self.cpu.itstate.state = data;
-    }
-
-    fn ldc_imm(&mut self) {
-        // A7.7.39
-        // TODO
-    }
-
-    fn ldc_lit(&mut self) {
-        // A7.7.40
-        // TODO
     }
 
     fn n_ldm(&mut self, data: u32) {
@@ -1345,26 +1292,6 @@ impl Board {
         }
         if wback && !bitset(registers, rn) {
             self.write_reg(rn, address);
-        }
-    }
-
-    fn ldmdb(&mut self, rn: u8, registers: u32, wback: bool) {
-        // A7.7.42
-        assert!((registers >> 14) == 0);
-
-        let mut address = self.read_reg(rn) - 4 * registers.count_ones();
-        let orig_address = address;
-        for i in 0..=14u8 {
-            if bitset(registers, i.into()) {
-                self.write_reg(i, self.memory.read_word(address).unwrap());
-                address += 4;
-            }
-        }
-        if bitset(registers, 15) {
-            self.load_write_pc(self.memory.read_word(address).unwrap());
-        }
-        if wback && !bitset(registers, rn.into()) {
-            self.write_reg(rn, orig_address);
         }
     }
 
@@ -1472,11 +1399,6 @@ impl Board {
         self.write_reg(rt, loaded);
     }
 
-    fn ldrb_lit(&mut self, rt: u8, address: u32) {
-        // A7.7.47
-        self.write_reg(rt, self.memory.read_byte(address).unwrap() as u32);
-    }
-
     fn n_ldrb_reg(&mut self, data: u32) {
         // A7.7.48
         let rt = data & 0x7;
@@ -1487,52 +1409,6 @@ impl Board {
         self.write_reg(rt, loaded);
     }
 
-    fn ldbrt(&mut self, rt: u8, rn: u8, offset: u32) {
-        // A7.7.49
-        let address = self.read_reg(rn).wrapping_add(offset);
-        self.write_reg(rt, self.memory.read_byte_unpriv(address).unwrap() as u32);
-    }
-
-    fn ldrd_imm(&mut self, rt: u8, rt2: u8, rn: u8, offset: i32, index: bool, wback: bool) {
-        // A7.7.50
-        let offset_address = self.read_reg(rn).wrapping_add(offset as u32);
-        let address = if index { offset_address } else { self.read_reg(rn) };
-        self.write_reg(rt, self.memory.read_word(address).unwrap());
-        self.write_reg(rt2, self.memory.read_word(address + 4).unwrap());
-        if wback { self.write_reg(rn, offset_address); }
-    }
-
-    fn ldrd_lit(&mut self, rt: u8, rt2: u8, offset: i32) {
-        // A7.7.51
-        if (self.read_pc() & 0b11) != 0 {
-            panic!("Unpredictable");
-        }
-        let address = self.read_pc().wrapping_add(offset as u32);
-        self.write_reg(rt, self.memory.read_word(address).unwrap());
-        self.write_reg(rt2, self.memory.read_word(address + 4).unwrap());
-    }
-
-    fn ldrex(&mut self, rt: u8, rn: u8, imm32: u32) {
-        // A7.7.52
-        let address = self.read_reg(rn).wrapping_add(imm32);
-        self.set_exclusive_monitors(address, 4);
-        self.write_reg(rt, self.memory.read_word(address).unwrap());
-    }
-
-    fn ldrexb(&mut self, rt: u8, rn: u8) {
-        // A7.7.53
-        let address = self.read_reg(rn);
-        self.set_exclusive_monitors(address, 1);
-        self.write_reg(rt, self.memory.read_byte(address).unwrap() as u32);
-    }
-
-    fn ldrexh(&mut self, rt: u8, rn: u8) {
-        // A7.7.53
-        let address = self.read_reg(rn);
-        self.set_exclusive_monitors(address, 2);
-        self.write_reg(rt, self.memory.read_halfword(address).unwrap() as u32);
-    }
-
     fn n_ldrh_imm(&mut self, data: u32) {
         // A7.7.55
         let imm6 = data & 0x3F;
@@ -1541,11 +1417,6 @@ impl Board {
         let address = self.read_reg(rn).wrapping_add(imm6);
         let loaded = self.memory.read_mem_u(address, 2).unwrap();
         self.write_reg(rt, loaded);
-    }
-
-    fn ldrh_lit(&mut self, rt: u8, address: u32) {
-        // A7.7.56
-        self.write_reg(rt, self.memory.read_mem_u(address, 2).unwrap());
     }
 
     fn n_ldrh_reg(&mut self, data: u32) {
@@ -2401,22 +2272,6 @@ impl Board {
         let rm = data >> 3;
         let result = self.read_reg(rm) & 0xFFFF;
         self.write_reg(rd, result);
-    }
-
-    fn step(&mut self) -> Result<(), String> {
-        match self.fetch() {
-            Ok((i, w)) => {
-                // println!("fetched {:?} ({})", tag::get_opcode(i.0), if w { "wide" } else { "narrow" });
-                return self.execute(i, w);
-            }
-            Err(e) => {
-                return Err(e);
-            }
-        };
-    }
-
-    fn spawn_audio(&mut self) {
-        self.audio_handler.spawn_audio();
     }
 }
 
