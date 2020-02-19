@@ -499,21 +499,16 @@ fn id_branch_and_misc(word: u32, c: Context) -> ByteInstruction {
 }
 
 fn id_data_proc_plain_binary_immediate(word: u32, c: Context) -> ByteInstruction {
+    // A5.3.3 // DONE
     assert!(matches(word, 15, 0b111_11_0_1_00000_0000_1, 0b111_10_0_1_00000_0000_0));
     let rd = (word >> 8) & 0xF;
     let rn = (word >> 16) & 0xF;
 
     let imm12 = word & 0xFF | (word & (0x7 << 12)) >> 4 | (word & (1 << 25)) >> 14;
-    let imm5 = (word & (0x7 << 12)) >> 9 | (word & (0x3 << 6)) >> 6;
-    let sat_imm = word & 0xF;
+    let imm5 = (word & (0x7 << 12)) >> 10 | (word & (0x3 << 6)) >> 6;
+    let sat_imm5 = word & 0x1F;
+    let shift_n = imm5;
 
-    // let shift_t = (word >> 4) & 0b11;
-    // let mut shift_n = (word >> 6) & 0b11 | (word & (0b111 << 12)) >> 10;
-    // // A7.4.2 DecodeImmShift special handling for ASR and LSR
-    // if shift_n == 0 && (shift_t == 0b01 || shift_t == 0b10) {
-    //     shift_n = 32;
-    // }
-    // let shift_n = shift_n;
 
     return match (word >> 20) & 0x1F {
         0b00000 => {
@@ -554,36 +549,77 @@ fn id_data_proc_plain_binary_immediate(word: u32, c: Context) -> ByteInstruction
         }
         0b10010 if imm5 != 0 => {
             // needs to go before SSAT
-            // SSAT16
-            let mut base = tag::get_wide(Opcode::Ssat16, c, rd | rn << 4, sat_imm + 1);
+            let saturate_to = (sat_imm5 & 0xF) + 1;
+            let mut base = tag::get_wide(Opcode::Ssat16, c, rd | rn << 4, saturate_to); // A7.7.153 T1
             if bitset(word, 26) || bitset(word, 5) || bitset(word, 4) || (rd == 13 || rd == 15) || (rn == 13 || rn == 15) {
                 base = tag::as_unpred_w(base);
             }
             base
         }
-        // 0b10000 | 0b10010 => {
-        //     // SSAT
-        //     let mut base = tag::get_wide(Opcode::Ssat, c, rd | rn << 4, 0);
-        // }
-        // 0b10100 => {
-        //     // SBFX
-        // }
-        // 0b10110 if rn != 15 => {
-        //     // BFI
-        // }
-        // 0b10110 if rn == 15 => {
-        //     // BFC
-        // }
-        // 0b11010 if imm5 != 0 => {
-        //     // needs to go before USAT
-        //     // USAT16
-        // }
-        // 0b11000 | 0b11010 => {
-        //     // USAT
-        // }
-        // 0b11100 => {
-        //     // UBFX
-        // }
+        0b10000 | 0b10010 => {
+            let sh = (word & (0b1 << 21)) >> 20;
+            let saturate_to = sat_imm5 + 1;
+            let mut base = tag::get_wide(Opcode::Ssat, c, rd | rn << 4, shift_n << 7 | sh << 6 | saturate_to); // A7.7.152 T1
+            if bitset(word, 26) || bitset(word, 5) || (rd == 13 || rd == 15) || (rn == 13 || rn == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b10100 => {
+            let widthm1 = sat_imm5;
+            let lsbit = imm5;
+            let mut base = tag::get_wide(Opcode::Sbfx, c, rd | rn << 4, widthm1 | lsbit << 5); // A7.7.126 T1
+            if bitset(word, 26) || bitset(word, 5) || (rd == 13 || rd == 15) || (rn == 13 || rn == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b10110 if rn != 15 => {
+            let msbit = sat_imm5;
+            let lsbit = shift_n;
+            let mut base = tag::get_wide(Opcode::Bfi, c, rd | rn << 4, msbit | lsbit << 5); // A7.7.14 T1
+            if bitset(word, 26) || bitset(word, 15) || bitset(word, 5) || (rd == 13 || rd == 15) || (rn == 13 || rn == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b10110 if rn == 15 => {
+            let msbit = sat_imm5;
+            let lsbit = imm5;
+            let mut base = tag::get_wide(Opcode::Bfc, c, rd, msbit | lsbit << 5); // A7.7.13 T1
+            if bitset(word, 26) || bitset(word, 5) || (rd == 13 || rd == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b11010 if imm5 != 0 => {
+            // needs to go before USAT
+            let saturate_to = sat_imm5 & 0xF;
+            let mut base = tag::get_wide(Opcode::Usat16, c, rd | rn << 4, saturate_to); // A7.7.214 T1
+            if bitset(word, 26) || bitset(word, 5) || bitset(word, 4) || (rd == 13 || rd == 15) || (rn == 13 || rn == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b11000 | 0b11010 => {
+            let sh = (word & (0b1 << 21)) >> 20;
+            let saturate_to = sat_imm5;
+            let mut base = tag::get_wide(Opcode::Usat, c, rd | rn << 4, shift_n << 6 | sh << 5 | saturate_to); // A7.7.213 T1
+            if bitset(word, 26) || bitset(word, 5) || (rd == 13 || rd == 15) || (rn == 13 || rn == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b11100 => {
+            // UBFX
+            let widthm1 = sat_imm5;
+            let lsbit = imm5;
+            let mut base = tag::get_wide(Opcode::Ubfx, c, rd | rn << 4, widthm1 | lsbit << 5); // A7.7.193 T1
+            if bitset(word, 26) || bitset(word, 5) || (rd == 13 || rd == 15) || (rn == 13 || rn == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
         _ => tag::get_undefined_wide(c, word),
     }
 }
