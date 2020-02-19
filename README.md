@@ -16,7 +16,7 @@ cargo build
 
 3. Follow one of the following to use this to debug a discoboard project. Make sure to use the correct paths instead of the placeholders. Change `debug` to `release` in the emulator path if you want to use a release build made with `cargo build --release` (use this if you want the best performance, such as when testing audio).
 
-    1. If using `cortex-debug` to debug, add the following to `.vscode/launch.json` configurations.
+    1. If using `cortex-debug` to debug, add the following to `.vscode/launch.json` configurations. TODO: find how cli args are passed, and optionally pass `--audio`.
 
     ```
     {
@@ -50,6 +50,7 @@ cargo build
     debug_server =
         /abs/path/to/comp2300-disco-emulator/target/debug/arm-emulator
         tcp::50030
+        ; --audio; uncomment to enable audio
         -kernel
         /abs/path/to/project/.pio/build/emulate/firmware.elf
     debug_init_cmds =
