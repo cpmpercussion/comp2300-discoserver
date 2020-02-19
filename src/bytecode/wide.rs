@@ -474,25 +474,168 @@ fn id_ldr_str_multiple(word: u32, c: Context) -> ByteInstruction {
 }
 
 fn id_branch_and_misc(word: u32, c: Context) -> ByteInstruction {
+    // A5.3.4 // DONE
     assert!(matches(word, 15, 0b111_11_0000000_0000_1, 0b111_10_0000000_0000_1));
+    let op = (word >> 20) & 0x7F;
     let op1 = (word >> 12) & 0b111;
 
-    if bitset(word, 12) {
-        return if bitset(word, 14) {
-            let mut mid = (word & (1 << 13)) << 9 | (word & (1 << 11)) << 10;
-            if !bitset(word, 26) {
-                mid = !mid & (0b11 << 21);
+    let sysm = word & 0xFF;
+    let mask = (word >> 10) & 0b11;
+    let rn = (word >> 16) & 0xF;
+    let rd = (word >> 8) & 0xF;
+    let imm11 = word & 0x7FF;
+    let j1 = (word >> 13) & 0b1;
+    let j2 = (word >> 11) & 0b1;
+    let s = (word >> 26) & 0b1;
+    let i1 = !(j1 ^ s) & 0b1;
+    let i2 = !(j2 ^ s) & 0b1;
+    let imm10 = (word >> 16) & 0x3FF;
+    let imm24 = imm11 | imm10 << 11 | i2 << 21 | i1 << 22 | s << 23;
+
+    if (op1 & 0b101) == 0b000 {
+        if (op & 0b0111000) != 0b0111000 {
+            let imm6 = (word >> 16) & 0x3F;
+            let cond = (word >> 22) & 0xF;
+            let imm20 = imm11 | imm6 << 11 | j1 << 17  | j2 << 18 | s << 19;
+            let mut base = tag::get_wide(Opcode::BranchCond, c, cond, imm20); // A7.7.12 T3
+            if c.it_pos != ItPos::None {
+                base = tag::as_unpred_it_w(base);
             }
-            let imm24 = word & 0x7FF | (word & (0x3FF << 16)) >> 5 | (word & (1 << 26)) >> 3 | mid;
-            let instr = tag::get_wide(Opcode::Bl, c, 0, imm24);
-            if c.it_pos == ItPos::Within {
-                tag::as_unpred_it_w(instr)
-            } else {
-                instr
+            return base;
+        }
+
+        if (op & 0b1111110) == 0b0111110 {
+            let mut base = tag::get_wide(Opcode::Msr, c, rn, sysm | mask << 8); // A7.7.82 T1, B5.2.3 T1
+            if bitset(word, 20) || bitset(word, 13) || bitset(word, 9) || bitset(word, 8) {
+                base = tag::as_unpred_w(base);
             }
-        } else {
-            tag::get_undefined_wide(c, word)
-        };
+            if mask == 0b00 || (mask != 0b10 && !(sysm <= 3)) || (rn == 13 || rn == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            match sysm {
+                0..=3 |
+                5..=9 |
+                16..=20 => {},
+                _ => {
+                    base = tag::as_unpred_w(base);
+                },
+            }
+            return base;
+        }
+
+        let option = word & 0xF;
+        if op == 0b0111010 {
+            // Hint instructions
+            let op2 = word & 0xFF;
+
+            if op1 != 0b000 {
+                return tag::get_undefined_wide(c, word);
+            }
+
+            let mut base = match op2 {
+                0b0000_0000 => tag::get_wide(Opcode::Nop, c, 0, 0), // A7.7.88 T2
+                0b0000_0001 => tag::get_wide(Opcode::Yield, c, 0, 0), // A7.7.263 T2
+                0b0000_0010 => tag::get_wide(Opcode::Wfe, c, 0, 0), // A7.7.261 T2
+                0b0000_0011 => tag::get_wide(Opcode::Wfi, c, 0, 0), // A7.7.262 T2
+                0b0000_0100 => tag::get_wide(Opcode::Sev, c, 0, 0), // A7.7.129 T2
+                0b0001_0100 => {
+                    let mut base = tag::get_wide(Opcode::Csdb, c, 0, 0); // A7.7.31 T1
+                    if c.it_pos != ItPos::None {
+                        base = tag::as_unpred_it_w(base);
+                    }
+                    base
+                }
+                0b1111_0000..=0b1111_1111 => tag::get_wide(Opcode::Dbg, c, option, 0), // A7.7.32 T1
+                _ => return tag::get_wide(Opcode::Nop, c, 0, 0),
+            };
+            if (word >> 11) & 0b1111_00_1_0_1 != 0b1111_00_0_0_0 {
+                base = tag::as_unpred_w(base);
+            }
+            return base;
+        }
+
+        if op == 0b0111011 {
+            // Misc control instructions
+            let opc = (word >> 4) & 0xF;
+
+            let mut base = match opc {
+                0b0010 => {
+                    let mut base = tag::get_wide(Opcode::Clrex, c, 0, 0); // A7.7.23 T1
+                    if option != 0b1111 {
+                        base = tag::as_unpred_w(base);
+                    }
+                    base
+                }
+                0b0100 if option != 0b0000 && option != 0b0100 => tag::get_wide(Opcode::Dsb, c, option, 0), // A7.7.34 T1
+                0b0100 if option == 0b0000 => {
+                    let mut base = tag::get_wide(Opcode::Ssbb, c, 0, 0); // A7.7.155 T1
+                    if c.it_pos != ItPos::None {
+                        base = tag::as_unpred_w(base);
+                    }
+                    base
+                }
+                0b0100 if option == 0b0100 => {
+                    let mut base = tag::get_wide(Opcode::Pssbb, c, 0, 0); // A7.7.100 T1
+                    if c.it_pos != ItPos::None {
+                        base = tag::as_unpred_w(base);
+                    }
+                    base
+                }
+                0b0101 => tag::get_wide(Opcode::Dmb, c, 0, 0), // A7.7.33 T1
+                0b0110 => {
+                    let mut base = tag::get_wide(Opcode::Isb, c, option, 0); // A7.7.37 T1
+                    if c.it_pos != ItPos::None {
+                        base = tag::as_unpred_w(base);
+                    }
+                    base
+                }
+                _ => return tag::get_undefined_wide(c, word),
+            };
+            if (word >> 8) & 0b1111_00_1_0_1111 != 0b1111_00_0_0_1111 {
+                base = tag::as_unpred_w(base);
+            }
+            return base;
+        }
+
+        if (op & 0b1111110) == 0b01111110 {
+            let mut base = tag::get_wide(Opcode::Mrs, c, rd, sysm); // A7.7.82 T1, B5.2.2 T1
+            if bitset(word, 20) || bitset(word, 13) || rn != 0b1111 {
+                base = tag::as_unpred_w(base);
+            }
+            if rd == 13 || rd == 15 {
+                base = tag::as_unpred_w(base);
+            }
+            match sysm {
+                0..=3 | 5..=9 | 16..=20 => {},
+                _ => {
+                    base = tag::as_unpred_w(base);
+                }
+            }
+            return base;
+        }
+    }
+
+    if op1 == 0b010 && op == 0b1111111 {
+        let imm4 = (word >> 16) & 0xF;
+        let imm12 = word & 0xFFF;
+        let imm16 = imm12 | imm4 << 12;
+        return tag::get_wide(Opcode::Udf, c, imm16, 0); // A7.7.194
+    }
+
+    if (op1 & 0b101) == 0b001 {
+        let mut base = tag::get_wide(Opcode::Branch, c, 0, imm24); // A7.7.12 T4
+        if c.it_pos == ItPos::Within {
+            base = tag::as_unpred_it_w(base);
+        }
+        return base;
+    }
+
+    if (op1 & 0b101) == 0b101 {
+        let mut base = tag::get_wide(Opcode::Bl, c, 0, imm24); // A7.7.18 T1
+        if c.it_pos == ItPos::Within {
+            base = tag::as_unpred_it_w(base);
+        }
+        return base;
     }
 
     return tag::get_undefined_wide(c, word);
@@ -842,34 +985,110 @@ fn id_data_proc_register(word: u32, c: Context) -> ByteInstruction {
 }
 
 fn id_store_single(word: u32, c: Context) -> ByteInstruction {
+    // A5.3.10 // DONE
     assert!(matches(word, 20, 0b111_1111_1_000_1, 0b111_1100_0_000_0));
 
+    let op1 = (word >> 21) & 0x7;
     let op2 = bitset(word, 11);
 
-    let rn = ((word >> 16) & 0b1111) as u8;
-    let rt = ((word >> 12) & 0b1111) as u8;
+    let rn = (word >> 16) & 0xF;
+    let rt = (word >> 12) & 0xF;
+    let rm = word & 0xF;
+    let imm12 = word & 0xFFF;
+    let imm8 = word & 0xFF;
+    let p = (word >> 10) & 0b1;
+    let u = (word >> 9) & 0b1;
+    let w = (word >> 8) & 0b1;
+    let imm2 = (word >> 4) & 0b11;
 
-    return match (word >> 21) & 0b111 {
-        0b110 => tag::get_wide(Opcode::StrImm, c, (word >> 12) & 0xFF, word & 0xFFF | 1 << 14), // A7.7.161 T3
+    let imm13 = if u == 1 {
+        imm8
+    } else {
+        get_negated_simm13(imm8)
+    };
+
+    return match op1 {
+        0b100 => {
+            let mut base = tag::get_wide(Opcode::StrbImm, c, rt | rn << 4, imm12 | 1 << 14 | 0 << 13); // A7.7.163 T2
+            if rt == 13 || rt == 15 {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b000 if op2 => {
+            let mut base = tag::get_wide(Opcode::StrbImm, c, rt | rn << 4, imm13 | p << 14 | w << 13); // A7.7.163 T3
+            if (rt == 13 || rt == 15) || (w == 1 && rn == rt) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b000 if !op2 => {
+            let mut base = tag::get_wide(Opcode::StrbReg, c, rt | rn << 4, rm | imm2 << 4); // A7.7.164 T2
+            if (rt == 13 || rt == 15) || (rm == 13 || rm == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b101 => {
+            let mut base = tag::get_wide(Opcode::StrhImm, c, rt | rn << 4, imm12 | 1 << 14 | 0 << 13); // A7.7.170 T2
+            if rt == 13 || rt == 15 {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b001 if op2 => {
+            let mut base = tag::get_wide(Opcode::StrhImm, c, rt | rn << 4, imm13 | p << 14 | w << 13); // A7.7.170 T3
+            if (rt == 13 || rt == 15) || (w == 1 && rn == rt) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b001 if !op2 => {
+            let mut base = tag::get_wide(Opcode::StrhReg, c, rt | rn << 4, rm | imm2 << 4); // A7.7.171 T2
+            if (rt == 13 || rt == 15) || (rm == 13 || rm == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b110 => {
+            let mut base = tag::get_wide(Opcode::StrImm, c, rt | rn << 4, imm12 | 1 << 14 | 0 << 13); // A7.7.161 T3
+            if rt == 15 {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
         0b010 if op2 => {
-            // p381 T4
-            let imm13 = if bitset(word, 9) {
-                word & 0xFF
-            } else {
-                (!(word & 0xFF) + 1) & 0x1FFF
-            };
-            tag::get_wide(Opcode::StrImm, c, (word >> 12) & 0xFF, imm13 | (word & (1 << 10)) << 4 | (word & (1 << 8)) << 5)
+            let mut base = tag::get_wide(Opcode::StrImm, c, rt | rn << 4, imm13 | p << 14 | w << 13); // A7.7.161 T4
+            if rt == 15 || (w == 1 && rn == rt) {
+                base = tag::as_unpred_w(base);
+            }
+            base
+        }
+        0b010 if !op2 => {
+            let mut base = tag::get_wide(Opcode::StrReg, c, rt | rn << 4, rm | imm2 << 4); // A7.7.162 T2
+            if rt == 15 || (rm == 13 || rm == 15) {
+                base = tag::as_unpred_w(base);
+            }
+            base
         }
         _ => tag::get_undefined_wide(c, word),
-    };
+    }
 }
 
 fn id_load_byte(word: u32, c: Context) -> ByteInstruction {
-    return tag::get_undefined_wide(c, word);
+    // A5.3.9
+    assert!(matches(word, 20, 0b111_1111_00_11_1, 0b111_1100_00_00_1));
+
+    let op1 = (word >> 23) & 0b11;
+    let rn = (word >> 16) & 0xF;
+    let rt = (word >> 12) & 0xF;
+    let op2 = (word >> 6) & 0x3F;
+
+    return tag::get_wide(Opcode::Unimplemented, c, word >> 30, (word << 2) >> 2);
 }
 
 fn id_load_half_word(word: u32, c: Context) -> ByteInstruction {
-    return tag::get_undefined_wide(c, word);
+    return tag::get_wide(Opcode::Unimplemented, c, word >> 30, (word << 2) >> 2);
 }
 
 // imm12 -> negate and mask to imm13
@@ -877,74 +1096,87 @@ fn get_negated_simm13(imm12: u32) -> u32 {
     return (!(imm12 & 0xFFF) + 1) & 0x1FFF;
 }
 
+fn msk(value: u32, mask: u32, expected: u32) -> bool {
+    return (value & mask) == expected;
+}
+
 fn id_load_word(word: u32, c: Context) -> ByteInstruction {
+    // A5.3.7
+    assert!(matches(word, 20, 0b111_1111_00_11_1, 0b111_1100_00_10_1));
+
     let op1 = (word >> 23) & 0b11;
     let op2 = (word >> 6) & 0x3F;
     let rn = (word >> 16) & 0xF;
     let rt = (word >> 12) & 0xF;
 
-    if op1 > 1 {
-        return tag::get_undefined_wide(c, word);
+    let rm = word & 0xF;
+    let imm2 = (word >> 4) & 0b11;
+    let imm12 = word & 0xFFF;
+    let imm8 = word & 0xFF;
+    let p = (word >> 10) & 0b1;
+    let u = (word >> 9) & 0b1;
+    let w = (word >> 8) & 0b1;
+
+    let imm13 = if u == 1 {
+        imm8
+    } else {
+        get_negated_simm13(imm8)
+    };
+
+    if op1 == 0b01 && rn != 15 {
+        // LDR (imm) T3
+        let mut base = tag::get_wide(Opcode::LdrImm, c, rt | rn << 4, imm12 | 1 << 14 | 0 << 13); // A7.7.43 T3
+        if rt == 15 && c.it_pos == ItPos::Within {
+            base = tag::as_unpred_it_w(base);
+        }
+        return base;
     }
 
-    if rn == 15 {
+    if op1 == 0b00 && (msk(op2, 0b100100, 0b100100) || msk(op2, 0b111100, 0b110000)) && rn != 15 {
+        // LDR (imm) T4
+        let mut base = tag::get_wide(Opcode::LdrImm, c, rt | rn << 4, imm13 | p << 14 | w << 13); // A7.7.43 T4
+        if w == 1 && rn == rt {
+            base = tag::as_unpred_w(base);
+        }
+        if rt == 15 && c.it_pos == ItPos::Within {
+            base = tag::as_unpred_it_w(base);
+        }
+        return base;
+    }
+
+    if op1 == 0b00 && msk(op2, 0b111100, 0b111000) && rn != 15 {
+        // LDRT
+        let mut base = tag::get_wide(Opcode::Ldrt, c, rt | rn << 4, imm8); // A7.7.67 T1
+        if rt == 13 || rt == 15 {
+            base = tag::as_unpred_w(base);
+        }
+        return base;
+    }
+
+    if op1 == 0b00 && op2 == 0b000000 && rn != 15 {
+        // LDR (reg)
+        let mut base = tag::get_wide(Opcode::LdrReg, c, rt | rn << 4, rm | imm2 << 4); // A7.7.45 T2
+        if rm == 13 || rm == 15 {
+            base = tag::as_unpred_w(base);
+        }
+        if rt == 15 && c.it_pos == ItPos::Within {
+            base = tag::as_unpred_it_w(base);
+        }
+        return base;
+    }
+
+    if (op1 == 0b00 || op1 == 0b01) && rn == 15 {
         let imm13 = if bitset(word, 23) {
-            word & 0xFFF
+            imm12
         } else {
-            get_negated_simm13(word)
+            get_negated_simm13(imm12)
         };
-        let base = tag::get_wide(Opcode::LdrLit, c, rt, imm13);
-        return if c.it_pos == ItPos::Within {
-            tag::as_unpred_it_w(base)
-        } else {
-            base
+        let mut base = tag::get_wide(Opcode::LdrLit, c, rt, imm13); // A7.7.44 T2
+        if rt == 15 && c.it_pos == ItPos::Within {
+            base = tag::as_unpred_it_w(base);
         }
+        return base;
     }
-
-    if op1 == 0b01 {
-        let imm13 = word & 0xFFF;
-        let base = tag::get_wide(Opcode::LdrImm, c, word & (0xFF << 12) >> 12, word & 0xFFF | 1 << 14); // A7.7.43 T3
-        return if c.it_pos == ItPos::Within {
-            tag::as_unpred_it_w(base)
-        } else {
-            base
-        }
-    }
-
-    if op2 == 0 {
-        return tag::get_wide(Opcode::LdrReg, c, word & (0xFF << 12) >> 12, word & 0x3F);
-    }
-
-    let op3 = op2 >> 2;
-
-    if op3 == 0b1100 || (op3 & 0b1001) == 0b1001 {
-        let imm13 = if bitset(word, 9) {
-            word & 0xFF
-        } else {
-            get_negated_simm13(word & 0xFF)
-        };
-        let base = tag::get_wide(Opcode::LdrImm, c, (word & (0xFF << 12)) >> 12, imm13 | (word & (1 << 10)) << 4 | (word & (1 << 8)) << 5); // A7.7.43 T4
-        let rt = (word >> 12) & 0xF;
-        let rn = (word >> 16) & 0xF;
-        let base = if bitset(word, 8) && rn == rt {
-            tag::as_unpred_w(base)
-        } else {
-            base
-        };
-        return if rt == 15 && c.it_pos == ItPos::Within {
-            tag::as_unpred_it_w(base)
-        } else {
-            base
-        }
-    }
-
-    // if op3 == 0b1110 {
-    //     return Instruction::Ldrt {
-    //         rn,
-    //         rt,
-    //         offset: offset8,
-    //     };
-    // }
 
     return tag::get_undefined_wide(c, word);
 }
