@@ -12,7 +12,7 @@ pub enum Opcode {
     AndImm, // W: blank[3]-setflags[1]-rn[4]-rd[4]-spill[4] + modified[30]
     AndReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[22]-shift_n[6]-shift_t[2]
     AsrImm, // N: blank[5]-shift[5]-rm[3]-rd[3] / W: blank[11]-setflags[1]-rm[4]-rd[4] + blank[24]-shift_n[6]
-    AsrReg, // N: blank[10]-rm[3]-rdn[3]
+    AsrReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[7]-setflags[1]-rn[4]-rd[4] + blank[26]-rm[4]
     Branch, // N: blank[5]-imm11[11] / W: blank[16] + blank[6]-imm24[24]
     BranchCond, // N: blank[4]-cond[4]-imm8[4] / W: blank[12]-cond[4] + blank[10]-imm20[20]
     Bfc,    // W: blank[12]-rd[4] + blank[20]-lsbit[5]-msbit[5]
@@ -26,6 +26,7 @@ pub enum Opcode {
     Cbz,    // N: blank[5]-nonzero[1]-rn[3]-imm7[7]
     Cdp,    // W: --unparsed--
     Clrex,  // W: blank[16] + blank[30]
+    Clz,    // W: blank[12]-rd[4] + blank[26]-rm[4]
     CmnImm, // W: blank[8]-rn[4]-spill[4] + modified[30]
     CmnReg, // N: blank[12]-rm[3]-rn[3] / W: blank[8]-rm[4]-rn[4] + blank[22]-shift_n[6]-shift_t[2]
     CmpImm, // N: blank[5]-rn[3]-imm8[8] / W: blank[8]-rn[4]-spill[4] + modified[30]
@@ -58,11 +59,13 @@ pub enum Opcode {
     LdrshReg, // N: blank[7]-rm[3]-rn[3]-rt[3]
     Ldrt,   // W: blank[8]-rn[4]-rt[4] + blank[22]-imm8[8]
     LslImm, // N: blank[5]-shift[5]-rm[3]-rd[3] / W: blank[7]-setflags[1]-rm[4]-rd[4] + blank[24]-shift_n[6]
-    LslReg, // N: blank[10]-rm[3]-rdn[3]
+    LslReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[7]-setflags[1]-rn[4]-rd[4] + blank[26]-rm[4]
     LsrImm, // N: blank[5]-shift[5]-rm[3]-rd[3]
-    LsrReg, // N: blank[10]-rm[3]-rdn[3]
+    LsrReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[7]-setflags[1]-rn[4]-rd[4] + blank[26]-rm[4]
     Mcr,   // W: --unparsed--
     Mcrr,   // W: --unparsed--
+    Mla,    // W: blank[8]-rn[4]-rd[4] + blank[22]-ra[4]-rm[4]
+    Mls,    // W: blank[8]-rn[4]-rd[4] + blank[22]-ra[4]-rm[4]
     MovImm, // N: blank[5]-rd[3]-imm8[8] / W: blank[]-setflags[1]-rd[4]-spill[4] + modified[30]
     MovReg, // N: blank[7]-setflags[1]-rm[4]-rd[4] / W: blank[]-setflags[1]-rd[4] + blank[26]-rm[4]
     Movt,
@@ -82,11 +85,16 @@ pub enum Opcode {
     Pop,    // N: blank[7]-pc[1]-regs[8] / W: blank[15]-mode[1] + (blank[15]-pc[1]-lr[1]-(sp)[1]-registers[13] | blank[26]-register[4])
     Pssbb,  // W: blank[16] + blank[30]
     Push,   // N: blank[7]-lr[1]-regs[8] / W: blank[15]-mode[1] + (blank[15]-pc[1]-lr[1]-(sp)[1]-registers[13] | blank[26]-register[4])
-    Rev,    // N: blank[12]-rm[3]-rd[3]
-    Rev16,  // N: blank[12]-rm[3]-rd[3]
-    Revsh,  // N: blank[12]-rm[3]-rd[3]
+    Qadd,   // W: blank[8]-rn[4]-rd[4] + blank[26]-rm[4]
+    Qdadd,  // W: blank[8]-rn[4]-rd[4] + blank[26]-rm[4]
+    Qdsub,  // W: blank[8]-rn[4]-rd[4] + blank[26]-rm[4]
+    Qsub,   // W: blank[8]-rn[4]-rd[4] + blank[26]-rm[4]
+    Rbit,   // W: blank[12]-rd[4] + blank[26]-rm[4]
+    Rev,    // N: blank[12]-rm[3]-rd[3] / W: blank[12]-rd[4] + blank[26]-rm[4]
+    Rev16,  // N: blank[12]-rm[3]-rd[3] / W: blank[12]-rd[4] + blank[26]-rm[4]
+    Revsh,  // N: blank[12]-rm[3]-rd[3] / W: blank[12]-rd[4] + blank[26]-rm[4]
     RorImm,
-    RorReg, // N: blank[10]-rm[3]-rdn[3]
+    RorReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[7]-setflags[1]-rn[4]-rd[4] + blank[26]-rm[4]
     Rrx,
     RsbImm, // N: blank[12]-rn[3]-rd[3]
     RsbReg, // W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[22]-shift_n[6]-shift_t[2]
@@ -94,7 +102,9 @@ pub enum Opcode {
     SbcReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[22]-shift_n[6]-shift_t[2]
     Sbfx,   // W: blank[8]-rn[4]-rd[4] + blank[20]-lsbit[5]-widthm1[5]
     Sdiv,   // W: blank[8]-rn[4]-rd[4] + blank[26]-rm[4]
+    Sel,    // W: blank[8]-rn[4]-rd[4] + blank[26]-rm[4]
     Sev,
+    Smlal,  // W: blank[8]-rm[4]-rn[4] + blank[22]-rd_hi[4]-rd_lo[4]
     Smull,  // W: blank[8]-rm[4]-rn[4] + blank[22]-rd_hi[4]-rd_lo[4]
     Ssat,   // W: blank[8]-rn[4]-rd[4] + blank[18]-shift_n[5]-sh[1]-saturate_to[6] // NOTE: Intentional shift_n=5
     Ssat16, // W: blank[8]-rn[4]-rd[4] + blank[24]-saturate_to[5]
@@ -126,6 +136,8 @@ pub enum Opcode {
     Ubfx,   // W: blank[8]-rn[4]-rd[4] + blank[20]-lsbit[5]-widthm1[5]
     Udf,    // N: blank[8]-imm8[8] / W: imm16[16] + blank[30]
     Udiv,
+    Umaal,  // W: blank[8]-rm[4]-rn[4] + blank[22]-rd_hi[4]-rd_lo[4]
+    Umlal,  // W: blank[8]-rm[4]-rn[4] + blank[22]-rd_hi[4]-rd_lo[4]
     Umull,  // W: blank[8]-rm[4]-rn[4] + blank[22]-rd_hi[4]-rd_lo[4]
     Usat,   // W: blank[8]-rn[4]-rd[4] + blank[19]-shift_n[5]-sh[1]-saturate_to[5] // NOTE: Intentional shift_n=5
     Usat16, // W: blank[8]-rn[4]-rd[4] + blank[24]-saturate_to[4]
