@@ -59,25 +59,11 @@ pub fn shifted_sign_extend(value: u32, bits: u32, shift: u32) -> u32 {
     return (((value << (31 - bits)) as i32) >> (31 - bits - shift)) as u32;
 }
 
-fn rotate_right_32_c(input: u32, shift: u32) -> (u32, CarryChange) {
+pub fn ror_c(input: u32, shift: u32) -> (u32, bool) {
     // p27
     assert!(shift != 0);
     let result = input.rotate_right(shift % 32);
-    let carry_out = if bitset(result, 31) {
-        CarryChange::Set
-    } else {
-        CarryChange::Clear
-    };
-    return (result, carry_out);
-}
-
-pub fn ror_c(input: u32, shift: u32) -> (u32, bool) {
-    let (result, change) = rotate_right_32_c(input, shift);
-    return match change {
-        CarryChange::Set => (result, true),
-        CarryChange::Clear => (result, false),
-        _ => panic!(),
-    }
+    return (result, bitset(result, 31));
 }
 
 pub fn rrx_c(input: u32, carry_in: u32) -> (u32, bool) {
