@@ -313,6 +313,11 @@ impl MemoryBus {
         }
     }
 
+    fn write_mem_a(&mut self, address: u32, size: usize, value: u32) -> Result<(), String> {
+        // TODO
+        return self.write_mem_u(address, size, value);
+    }
+
     fn write_word(&mut self, address: u32, value: u32) -> Result<(), String> {
         return self.write_mem_u(address, 4, value);
     }
@@ -350,10 +355,10 @@ impl Board {
     fn step(&mut self) -> Result<(), String> {
         match self.fetch() {
             Ok((i, w)) => {
-                // println!("fetched {:?} ({})", tag::get_opcode(i.0), if w { "wide" } else { "narrow" });
                 return self.execute(i, w);
             }
             Err(e) => {
+                // TODO: Goto default handler
                 return Err(e);
             }
         };
@@ -437,12 +442,13 @@ impl Board {
             Opcode::AdcReg => self.w_adc_reg(data, extra),
             Opcode::AddImm => self.w_add_imm(data, extra),
             Opcode::AddReg => self.w_add_reg(data, extra),
-            Opcode::AddSpImm => panic!(),
-            Opcode::AddSpReg => panic!(),
             Opcode::Adr    => self.w_adr(data, extra),
             Opcode::AndImm => self.w_and_imm(data, extra),
             Opcode::AndReg => self.w_and_reg(data, extra),
             Opcode::AsrImm => self.w_asr_imm(data, extra),
+            Opcode::AsrReg => self.w_asr_reg(data, extra),
+            Opcode::Branch => self.w_branch(data, extra),
+            Opcode::BranchCond => self.w_branch_cond(data, extra),
             Opcode::BicImm => self.w_bic_imm(data, extra),
             Opcode::BicReg => self.w_bic_reg(data, extra),
             Opcode::Bl     => self.w_bl(data, extra),
@@ -456,8 +462,13 @@ impl Board {
             Opcode::LdrImm => self.w_ldr_imm(data, extra),
             Opcode::LdrLit => self.w_ldr_lit(data, extra),
             Opcode::LdrReg => self.w_ldr_reg(data, extra),
+            Opcode::Ldrex  => self.w_ldrex(data, extra),
             Opcode::LslImm => self.w_lsl_imm(data, extra),
+            Opcode::LslReg => self.w_lsl_reg(data, extra),
             Opcode::LsrImm => self.w_lsr_imm(data, extra),
+            Opcode::LsrReg => self.w_lsr_reg(data, extra),
+            Opcode::Mla    => self.w_mla(data, extra),
+            Opcode::Mls    => self.w_mls(data, extra),
             Opcode::MovImm => self.w_mov_imm(data, extra),
             Opcode::MovReg => self.w_mov_reg(data, extra),
             Opcode::Movt   => self.w_movt(data, extra),
@@ -470,23 +481,32 @@ impl Board {
             Opcode::OrrReg => self.w_orr_reg(data, extra),
             Opcode::Pkhbt  => self.w_pkhbt(data, extra),
             Opcode::Pop    => self.w_pop(data, extra),
+            Opcode::Push   => self.w_push(data, extra),
+            Opcode::Qadd   => self.w_qadd(data, extra),
+            Opcode::Qsub   => self.w_qsub(data, extra),
             Opcode::RorImm => self.w_ror_imm(data, extra),
+            Opcode::RorReg => self.w_ror_reg(data, extra),
             Opcode::Rrx    => self.w_rrx(data, extra),
             Opcode::RsbImm => self.w_rsb_imm(data, extra),
             Opcode::RsbReg => self.w_rsb_reg(data, extra),
             Opcode::SbcImm => self.w_sbc_imm(data, extra),
             Opcode::SbcReg => self.w_sbc_reg(data, extra),
             Opcode::Sdiv   => self.w_sdiv(data, extra),
+            Opcode::Smlal  => self.w_smlal(data, extra),
             Opcode::Smull  => self.w_smull(data, extra),
             Opcode::Stm    => self.w_stm(data, extra),
             Opcode::StrImm => self.w_str_imm(data, extra),
+            Opcode::StrReg => self.w_str_reg(data, extra),
+            Opcode::Strex  => self.w_strex(data, extra),
             Opcode::SubImm => self.w_sub_imm(data, extra),
             Opcode::SubReg => self.w_sub_reg(data, extra),
+            Opcode::Tbb    => self.w_tbb(data, extra),
             Opcode::TeqImm => self.w_teq_imm(data, extra),
             Opcode::TeqReg => self.w_teq_reg(data, extra),
             Opcode::TstImm => self.w_tst_imm(data, extra),
             Opcode::TstReg => self.w_tst_reg(data, extra),
             Opcode::Udiv   => self.w_udiv(data, extra),
+            Opcode::Umlal  => self.w_umlal(data, extra),
             Opcode::Umull  => self.w_umull(data, extra),
             _ => {
                 // unsafe { unreachable_unchecked() }
@@ -1036,18 +1056,46 @@ impl Board {
         }
     }
 
+    fn w_asr_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.11
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let setflags = bitset(data, 8);
+        let rm = extra;
+
+        let shift_n = self.read_reg(rm) & 0xFF;
+        let (result, carry) = bits::asr_c(self.read_reg(rn), shift_n);
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nzc(result, carry);
+        }
+    }
+
     fn n_branch(&mut self, data: u32) {
         // A7.7.12
-        self.branch_write_pc(self.read_pc().wrapping_add(shifted_sign_extend(data, 10, 1)));
+        let imm11 = data;
+        let imm32 = shifted_sign_extend(imm11, 10, 1);
+        self.branch_write_pc(self.read_pc().wrapping_add(imm32));
+    }
+
+    fn w_branch(&mut self, data: u32, extra: u32) {
+        // A7.7.12
+        let imm24 = extra;
+        let imm32 = shifted_sign_extend(imm24, 23, 1);
+        self.branch_write_pc(self.read_pc().wrapping_add(imm32));
     }
 
     fn n_branch_cond(&mut self, data: u32) {
         // A7.7.12
         if self.cpu.check_condition(Condition::new(data >> 8)) {
-            // println!("Condition passed");
             self.branch_write_pc(self.read_pc().wrapping_add(shifted_sign_extend(data, 7, 1)));
-        } else {
-            // println!("Condition failed");
+        }
+    }
+
+    fn w_branch_cond(&mut self, data: u32, extra: u32) {
+        // A7.7.12
+        if self.cpu.check_condition(Condition::new(data)) {
+            self.branch_write_pc(self.read_pc().wrapping_add(shifted_sign_extend(extra, 19, 1)));
         }
     }
 
@@ -1409,6 +1457,17 @@ impl Board {
         self.write_reg(rt, loaded);
     }
 
+    fn w_ldrex(&mut self, data: u32, extra: u32) {
+        // TODO: Exclusive tracking
+        let rt = data;
+        let imm10 = extra & 0x3FF;
+        let rn = extra >> 10;
+
+        let address = self.read_reg(rn).wrapping_add(imm10);
+        self.set_exclusive_monitors(address, 4);
+        self.write_reg(rt, self.memory.read_mem_a(address, 4).unwrap_or_default());
+    }
+
     fn n_ldrh_imm(&mut self, data: u32) {
         // A7.7.55
         let imm6 = data & 0x3F;
@@ -1487,6 +1546,21 @@ impl Board {
         }
     }
 
+    fn w_lsl_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.69
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let setflags = bitset(data, 8);
+        let rm = extra;
+
+        let shift_n = self.read_reg(rm) & 0xFF;
+        let (result, carry) = bits::lsl_c(self.read_reg(rn), shift_n);
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nzc(result, carry);
+        }
+    }
+
     fn n_lsr_imm(&mut self, data: u32) {
         // A7.7.70
         let rd = data & 0x7;
@@ -1523,6 +1597,50 @@ impl Board {
         if !self.in_it_block() {
             self.set_flags_nzc(result, carry);
         }
+    }
+
+    fn w_lsr_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.71
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let setflags = bitset(data, 8);
+        let rm = extra;
+
+        let shift_n = self.read_reg(rm) & 0xFF;
+        let (result, carry) = bits::lsr_c(self.read_reg(rn), shift_n);
+        self.write_reg(rd, result);
+        if setflags {
+            self.set_flags_nzc(result, carry);
+        }
+    }
+
+    fn w_mla(&mut self, data: u32, extra: u32) {
+        // A7.7.74
+        let rd = data & 0xF;
+        let rn = data >> 4;
+        let rm = extra & 0xF;
+        let ra = extra >> 4;
+
+        let op1 = self.read_reg(rn);
+        let op2 = self.read_reg(rm);
+        let addend = self.read_reg(ra);
+        let result = op1.wrapping_mul(op2).wrapping_add(addend);
+        self.write_reg(rd, result);
+        // if setflags... wait... hmmm.
+    }
+
+    fn w_mls(&mut self, data: u32, extra: u32) {
+        // A7.7.75
+        let rd = data & 0xF;
+        let rn = data >> 4;
+        let rm = extra & 0xF;
+        let ra = extra >> 4;
+
+        let op1 = self.read_reg(rn);
+        let op2 = self.read_reg(rm);
+        let addend = self.read_reg(ra);
+        let result = addend.wrapping_sub(op1.wrapping_mul(op2));
+        self.write_reg(rd, result);
     }
 
     fn n_mov_imm(&mut self, data: u32) {
@@ -1780,13 +1898,14 @@ impl Board {
             }
             address += 4;
         } else {
+            let registers = extra & 0xFFFF;
             for i in 0..=14u32 {
-                if bitset(extra, i) {
+                if bitset(registers, i) {
                     self.write_reg(i, self.memory.read_mem_a(address, 4).unwrap_or_default());
                     address += 4;
                 }
             }
-            if bitset(extra, 15) {
+            if bitset(registers, 15) {
                 self.load_write_pc(self.memory.read_mem_u(address, 4).unwrap_or_default());
                 address += 4;
             }
@@ -1799,15 +1918,70 @@ impl Board {
         let mut address = self.read_sp();
         if bitset(data, 8) {
             address -= 4;
-            self.memory.write_word(address, self.read_lr()).unwrap();
+            self.memory.write_word(address, self.read_lr()).unwrap_or_default();
         }
         for i in (0..8u32).rev() {
             if bitset(data, i) {
                 address -= 4;
-                self.memory.write_word(address, self.read_reg(i)).unwrap();
+                self.memory.write_word(address, self.read_reg(i)).unwrap_or_default();
             }
         }
         self.write_sp(address);
+    }
+
+    fn w_push(&mut self, data: u32, extra: u32) {
+        // A7.7.101
+        let single_mode = bitset(data, 0);
+        let mut address = self.read_sp();
+
+        if single_mode {
+            let rt = extra;
+            address -= 4;
+            self.memory.write_mem_u(address, 4, self.read_reg(rt)).unwrap_or_default();
+        } else {
+            let registers = data & 0xFFFF;
+            for i in (0..=14u32).rev() {
+                if bitset(registers, i) {
+                    address -= 4;
+                    self.memory.write_mem_u(address, 4, self.read_reg(i)).unwrap_or_default();
+                }
+            }
+        }
+        self.write_sp(address);
+    }
+
+    fn w_qadd(&mut self, data: u32, extra: u32) {
+        // A7.7.102
+        let rd = data & 0xF;
+        let rn = data >> 4;
+        let rm = extra;
+
+        let rm_val = self.read_reg(rm) as i32;
+        let rn_val = self.read_reg(rn) as i32;
+        let (result, sat) = rm_val.overflowing_add(rn_val);
+        if sat {
+            self.write_reg(rd, rm_val.saturating_add(rn_val) as u32);
+            self.cpu.set_saturation_flag(true);
+        } else {
+            self.write_reg(rd, result as u32);
+        }
+    }
+
+    fn w_qsub(&mut self, data: u32, extra: u32) {
+        // A7.7.109
+        let rd = data & 0xF;
+        let rn = data >> 4;
+        let rm = extra;
+
+        let rm_val = self.read_reg(rm) as i32;
+        let rn_val = self.read_reg(rn) as i32;
+        let (result, sat) = rm_val.overflowing_sub(rn_val);
+        if sat {
+            self.write_reg(rd, rm_val.saturating_sub(rn_val) as u32);
+            self.cpu.set_saturation_flag(true);
+        } else {
+            self.write_reg(rd, result as u32);
+        }
     }
 
     fn n_rev(&mut self, data: u32) {
@@ -1858,6 +2032,21 @@ impl Board {
         let (result, carry) = bits::ror_c(self.read_reg(rdn), shift);
         self.write_reg(rdn, result);
         if !self.in_it_block() {
+            self.set_flags_nzc(result, carry);
+        }
+    }
+
+    fn w_ror_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.117
+        let rd = data & 0xF;
+        let rn = (data >> 4) & 0xF;
+        let setflags = bitset(data, 8);
+        let rm = extra;
+
+        let shift_n = self.read_reg(rm) & 0xFF;
+        let (result, carry) = bits::ror_c(self.read_reg(rn), shift_n);
+        self.write_reg(rd, result);
+        if setflags {
             self.set_flags_nzc(result, carry);
         }
     }
@@ -1977,6 +2166,23 @@ impl Board {
         self.write_reg(rd, result);
     }
 
+    fn w_smlal(&mut self, data: u32, extra: u32) {
+        // A7.7.138
+        let rn = data & 0xF;
+        let rm = data >> 4;
+        let rd_lo = extra & 0xF;
+        let rd_hi = extra >> 4;
+
+        let rd_lo_val = self.read_reg(rd_lo) as u64;
+        let rd_hi_val = self.read_reg(rd_hi) as u64;
+        let addend = rd_hi_val << 32 + rd_lo_val;
+        let rn_val = i64::from(self.read_reg(rn) as i32);
+        let rm_val = i64::from(self.read_reg(rm) as i32);
+        let result = ((rn_val * rm_val) as u64).wrapping_add(addend);
+        self.write_reg(rd_lo, (result & 0xFFFF_FFFF) as u32);
+        self.write_reg(rd_hi, (result >> 32) as u32);
+    }
+
     fn w_smull(&mut self, data: u32, extra: u32) {
         // A7.7.149
         let rn = data & 0xF;
@@ -1984,9 +2190,9 @@ impl Board {
         let rd_lo = extra & 0xF;
         let rd_hi = extra >> 4;
 
-        let rn_val = self.read_reg(rn) as i64;
-        let rm_val = self.read_reg(rm) as i64;
-        let result = rn_val * rm_val;
+        let rn_val = i64::from(self.read_reg(rn) as i32);
+        let rm_val = i64::from(self.read_reg(rm) as i32);
+        let result = (rn_val * rm_val) as u64;
         self.write_reg(rd_lo, (result & 0xFFFF_FFFF) as u32);
         self.write_reg(rd_hi, (result >> 32) as u32);
     }
@@ -2054,6 +2260,18 @@ impl Board {
         self.memory.write_mem_u(address, 4, self.read_reg(rt)).unwrap();
     }
 
+    fn w_str_reg(&mut self, data: u32, extra: u32) {
+        // A7.7.162
+        let rt = data & 0xF;
+        let rn = data >> 4;
+        let rm = extra & 0xF;
+        let imm2 = extra >> 2;
+
+        let (offset, _) = bits::lsl_c(self.read_reg(rm), imm2);
+        let address = self.read_reg(rn).wrapping_add(offset);
+        self.memory.write_mem_u(address, 4, self.read_reg(rt)).unwrap_or_default();
+    }
+
     fn n_strb_imm(&mut self, data: u32) {
         // A7.7.163
         let rt = data & 0x7;
@@ -2070,6 +2288,22 @@ impl Board {
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
         self.memory.write_mem_u(address, 1, self.read_reg(rt)).unwrap();
+    }
+
+    fn w_strex(&mut self, data: u32, extra: u32) {
+        // A7.7.167
+        let rt = data & 0xF;
+        let rd = data >> 4;
+        let imm10 = extra & 0x3FF;
+        let rn = extra >> 10;
+
+        let address = self.read_reg(rn).wrapping_add(imm10);
+        if /* ExclusiveMonitorsPass(address,4) */ true {
+            self.memory.write_mem_a(address, 4, self.read_reg(rt)).unwrap_or_default();
+            self.write_reg(rd, 0);
+        } else {
+            self.write_reg(rd, 1);
+        }
     }
 
     fn n_strh_imm(&mut self, data: u32) {
@@ -2171,6 +2405,22 @@ impl Board {
         self.write_reg(rd, result);
     }
 
+    fn w_tbb(&mut self, data: u32, extra: u32) {
+        // A7.7.185
+        let rn = data & 0xF;
+        let is_tbh = bitset(data, 4);
+        let rm = extra;
+
+        let rn_val = self.read_reg(rn);
+        let rm_val = self.read_reg(rm);
+        let halfwords = if is_tbh {
+            self.memory.read_mem_u(rn_val + rm_val << 1, 2).unwrap_or_default()
+        } else {
+            self.memory.read_mem_u(rn_val + rm_val, 1).unwrap_or_default()
+        };
+        self.branch_write_pc(self.read_pc().wrapping_add(halfwords * 2));
+    }
+
     fn w_teq_imm(&mut self, data: u32, extra: u32) {
         // A7.7.186
         let imm32 = data << 30 | extra;
@@ -2242,6 +2492,23 @@ impl Board {
             self.read_reg(rn) / m
         };
         self.write_reg(rd, result);
+    }
+
+    fn w_umlal(&mut self, data: u32, extra: u32) {
+        // A7.7.203
+        let rn = data & 0xF;
+        let rm = data >> 4;
+        let rd_lo = extra & 0xF;
+        let rd_hi = extra >> 4;
+
+        let rd_lo_val = self.read_reg(rd_lo) as u64;
+        let rd_hi_val = self.read_reg(rd_hi) as u64;
+        let rn_val = self.read_reg(rn) as u64;
+        let rm_val = self.read_reg(rm) as u64;
+        let addend = rd_hi_val << 32 + rd_lo_val;
+        let result = (rn_val * rm_val).wrapping_add(addend);
+        self.write_reg(rd_lo, (result & 0xFFFF_FFFF) as u32);
+        self.write_reg(rd_hi, (result >> 32) as u32);
     }
 
     fn w_umull(&mut self, data: u32, extra: u32) {

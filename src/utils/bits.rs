@@ -124,7 +124,6 @@ pub fn rrx(input: u32, carry_in: u32) -> u32 {
 
 pub fn lsl_c(input: u32, shift: u32) -> (u32, bool) {
     // p26
-    assert!(shift > 0 && shift <= 32);
     let result = input << shift;
     let carry_out = bitset(input, 32 - shift);
     return (result, carry_out);
@@ -132,7 +131,6 @@ pub fn lsl_c(input: u32, shift: u32) -> (u32, bool) {
 
 pub fn lsr_c(input: u32, shift: u32) -> (u32, bool) {
     // p26
-    assert!(shift > 0 && shift <= 32);
     let result = input >> shift;
     let carry_out = bitset(input, shift - 1);
     return (result, carry_out);
@@ -140,7 +138,6 @@ pub fn lsr_c(input: u32, shift: u32) -> (u32, bool) {
 
 pub fn asr_c(input: u32, shift: u32) -> (u32, bool) {
     // p27
-    assert!(shift > 0 && shift <= 32);
     let result = ((input as i32) >> shift) as u32;
     let carry_out = bitset(input, shift - 1);
     return (result, carry_out);

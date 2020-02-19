@@ -62,7 +62,7 @@ pub enum Opcode {
     LslReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[7]-setflags[1]-rn[4]-rd[4] + blank[26]-rm[4]
     LsrImm, // N: blank[5]-shift[5]-rm[3]-rd[3]
     LsrReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[7]-setflags[1]-rn[4]-rd[4] + blank[26]-rm[4]
-    Mcr,   // W: --unparsed--
+    Mcr,    // W: --unparsed--
     Mcrr,   // W: --unparsed--
     Mla,    // W: blank[8]-rn[4]-rd[4] + blank[22]-ra[4]-rm[4]
     Mls,    // W: blank[8]-rn[4]-rd[4] + blank[22]-ra[4]-rm[4]
