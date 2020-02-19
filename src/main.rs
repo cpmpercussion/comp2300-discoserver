@@ -5,9 +5,6 @@
 #[macro_use]
 extern crate goblin;
 
-mod instruction;
-use instruction::{CarryChange, Instruction, ShiftType};
-
 mod peripherals;
 use peripherals::Peripherals;
 
@@ -59,6 +56,15 @@ enum Exception {
 #[derive(Debug)]
 enum AccessType {
     Normal,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ShiftType {
+    LSL,
+    LSR,
+    ASR,
+    ROR,
+    RRX,
 }
 
 #[derive(Debug)]

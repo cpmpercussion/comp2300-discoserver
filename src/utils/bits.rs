@@ -1,5 +1,11 @@
-use crate::Shift;
-use crate::instruction::{ShiftType, CarryChange};
+use crate::{Shift, ShiftType};
+
+#[derive(Copy, Clone, Debug)]
+enum CarryChange {
+    Same,
+    Set,
+    Clear,
+}
 
 pub fn bitset<T: Into<u32>>(word: T, bit: T) -> bool {
     let word = word.into();
@@ -53,38 +59,7 @@ pub fn shifted_sign_extend(value: u32, bits: u32, shift: u32) -> u32 {
     return (((value << (31 - bits)) as i32) >> (31 - bits - shift)) as u32;
 }
 
-// The pseudocode definition takes the current carry flag state
-// but does not use it in calculations. To make instructions stateless,
-// we instead return a value representing what to do with the current
-// carry flag when we execute it.
-pub fn thumb_expand_imm_c(input: u32) -> (u32, CarryChange) {
-    // p137
-    assert!((input & !0xFFF) == 0); // only works on 12 bit numbers
-    if (input >> 8) == 0 {
-        return (input, CarryChange::Same); // 000X
-    }
-
-    if (input >> 10) == 0 {
-        let base = input & 0xFF;
-        if base == 0 {
-            panic!("Unpredictable thumb imm expansion");
-        }
-
-        let val = match input >> 8 {
-            0b01 => (base << 16) + base,                              // 0X0X
-            0b10 => (base << 24) + (base << 8),                       // X0X0
-            0b11 => (base << 24) + (base << 16) + (base << 8) + base, // XXXX
-            _ => panic!("Unexpected pattern"),
-        };
-
-        return (val, CarryChange::Same);
-    }
-
-    let unrotated_value = (1 << 7) | (input & 0xFF);
-    return rotate_right_32_c(unrotated_value, input >> 7);
-}
-
-pub fn rotate_right_32_c(input: u32, shift: u32) -> (u32, CarryChange) {
+fn rotate_right_32_c(input: u32, shift: u32) -> (u32, CarryChange) {
     // p27
     assert!(shift != 0);
     let result = input.rotate_right(shift % 32);
@@ -103,11 +78,6 @@ pub fn ror_c(input: u32, shift: u32) -> (u32, bool) {
         CarryChange::Clear => (result, false),
         _ => panic!(),
     }
-}
-
-pub fn thumb_expand_imm(val: u32) -> u32 {
-    // p137
-    return thumb_expand_imm_c(val).0;
 }
 
 pub fn rrx_c(input: u32, carry_in: u32) -> (u32, bool) {
