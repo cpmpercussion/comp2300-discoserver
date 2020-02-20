@@ -128,8 +128,8 @@ pub enum Location {
 }
 
 struct MemoryBus {
-    flash: Box<[u8; 1024 * 1024]>,
-    data: Box<[u8; 128 * 1024]>,
+    flash: Box<[u8]>,
+    data: Box<[u8]>,
     peripherals: Peripherals
 }
 
@@ -161,8 +161,8 @@ fn write_value(mut value: u32, bank: &mut[u8], base: usize, size: usize) -> Resu
 impl MemoryBus {
     fn new() -> MemoryBus {
         return MemoryBus {
-            flash: Box::new([0xFF; 1024 * 1024]),
-            data: Box::new([0xFF; 128 * 1024]),
+            flash: vec![0xFF; 1024 * 1024].into_boxed_slice(),
+            data: vec![0xFF; 128 * 1024].into_boxed_slice(), 
             peripherals: Peripherals::new(),
         };
     }
