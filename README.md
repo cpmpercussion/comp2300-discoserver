@@ -59,3 +59,10 @@ cargo build
     ```
 
 4. Select the `ARM Emulator Debug` (or `PIO Debug` if platformio) option in the debug selection and use it like normal.
+
+
+### Project structure
+
+- `src/main.rs`: The entry point of the `discoserver` executable. Wraps the `disco_emulator` library in a GDB remote protocol compatible server.
+- `disco_emulator/src/lib.rs`: The entry point for the emulator itself.
+- `tests/*`: Tests for the emulator.
