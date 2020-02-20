@@ -1215,7 +1215,11 @@ fn id_store_single(word: u32, c: Context) -> ByteInstruction {
             base
         }
         0b010 if op2 => {
-            let mut base = tag::get_wide(Opcode::StrImm, c, rt | rn << 4, imm13 | p << 14 | w << 13); // A7.7.161 T4
+            let mut base = if rn == 13 && p == 1 && u == 0 && w == 1 && imm8 == 0b00000100 {
+                tag::get_wide(Opcode::Push, c, 1, rt) // A7.7.101 T4
+            } else {
+                tag::get_wide(Opcode::StrImm, c, rt | rn << 4, imm13 | p << 14 | w << 13) // A7.7.161 T4
+            };
             if rt == 15 || (w == 1 && rn == rt) {
                 base = tag::as_unpred_w(base);
             }
@@ -1281,7 +1285,6 @@ fn id_load_word(word: u32, c: Context) -> ByteInstruction {
     };
 
     if op1 == 0b01 && rn != 15 {
-        // LDR (imm) T3
         let mut base = tag::get_wide(Opcode::LdrImm, c, rt | rn << 4, imm12 | 1 << 14 | 0 << 13); // A7.7.43 T3
         if rt == 15 && c.it_pos == ItPos::Within {
             base = tag::as_unpred_it_w(base);
@@ -1290,8 +1293,11 @@ fn id_load_word(word: u32, c: Context) -> ByteInstruction {
     }
 
     if op1 == 0b00 && (msk(op2, 0b100100, 0b100100) || msk(op2, 0b111100, 0b110000)) && rn != 15 {
-        // LDR (imm) T4
-        let mut base = tag::get_wide(Opcode::LdrImm, c, rt | rn << 4, imm13 | p << 14 | w << 13); // A7.7.43 T4
+        let mut base = if rn == 13 && p == 0 && u == 1 && w == 1 && imm8 == 0b0000_0100 {
+            tag::get_wide(Opcode::Pop, c, 1, rt) // A7.7.99 T4
+        } else {
+            tag::get_wide(Opcode::LdrImm, c, rt | rn << 4, imm13 | p << 14 | w << 13) // A7.7.43 T4
+        };
         if w == 1 && rn == rt {
             base = tag::as_unpred_w(base);
         }
@@ -1302,7 +1308,6 @@ fn id_load_word(word: u32, c: Context) -> ByteInstruction {
     }
 
     if op1 == 0b00 && msk(op2, 0b111100, 0b111000) && rn != 15 {
-        // LDRT
         let mut base = tag::get_wide(Opcode::Ldrt, c, rt | rn << 4, imm8); // A7.7.67 T1
         if rt == 13 || rt == 15 {
             base = tag::as_unpred_w(base);
@@ -1311,7 +1316,6 @@ fn id_load_word(word: u32, c: Context) -> ByteInstruction {
     }
 
     if op1 == 0b00 && op2 == 0b000000 && rn != 15 {
-        // LDR (reg)
         let mut base = tag::get_wide(Opcode::LdrReg, c, rt | rn << 4, rm | imm2 << 4); // A7.7.45 T2
         if rm == 13 || rm == 15 {
             base = tag::as_unpred_w(base);
