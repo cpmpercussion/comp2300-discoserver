@@ -465,6 +465,7 @@ impl Board {
             Opcode::EorImm => self.w_eor_imm(data, extra),
             Opcode::EorReg => self.w_eor_reg(data, extra),
             Opcode::Ldm    => self.w_ldm(data, extra),
+            Opcode::Ldmdb  => self.w_ldmdb(data, extra),
             Opcode::LdrImm => self.w_ldr_imm(data, extra),
             Opcode::LdrLit => self.w_ldr_lit(data, extra),
             Opcode::LdrReg => self.w_ldr_reg(data, extra),
@@ -501,6 +502,7 @@ impl Board {
             Opcode::Smlal  => self.w_smlal(data, extra),
             Opcode::Smull  => self.w_smull(data, extra),
             Opcode::Stm    => self.w_stm(data, extra),
+            Opcode::Stmdb  => self.w_stmdb(data, extra),
             Opcode::StrImm => self.w_str_imm(data, extra),
             Opcode::StrReg => self.w_str_reg(data, extra),
             Opcode::Strex  => self.w_strex(data, extra),
@@ -1320,7 +1322,7 @@ impl Board {
         let mut address = self.read_reg(rn);
         for i in 0..=7u32 {
             if bitset(registers, i) {
-                self.write_reg(i, self.memory.read_word(address).unwrap());
+                self.write_reg(i, self.memory.read_word(address).unwrap_or_default());
                 address += 4;
             }
         }
@@ -1334,18 +1336,40 @@ impl Board {
         let rn = data;
         let registers = extra;
         let wback = bitset(extra, 16);
+
         let mut address = self.read_reg(rn);
         for i in 0..=14u32 { // TODO: Skip stack pointer
             if bitset(registers, i) {
-                self.write_reg(i, self.memory.read_word(address).unwrap());
+                self.write_reg(i, self.memory.read_word(address).unwrap_or_default());
                 address += 4;
             }
         }
         if bitset(registers, 15) {
-            self.load_write_pc(self.memory.read_word(address).unwrap());
+            self.load_write_pc(self.memory.read_word(address).unwrap_or_default());
         }
         if wback && !bitset(registers, rn) {
             self.write_reg(rn, address);
+        }
+    }
+
+    fn w_ldmdb(&mut self, data: u32, extra: u32) {
+        // A7.7.42
+        let rn = data;
+        let registers = extra & 0xFFFF;
+        let wback = bitset(extra, 16);
+
+        let mut address = self.read_reg(rn) - 4 * registers.count_ones();
+        for i in 0..=14u32 {
+            if bitset(registers, i) {
+                self.write_reg(i, self.memory.read_mem_a(address, 4).unwrap_or_default());
+                address += 4;
+            }
+        }
+        if bitset(registers, 15) {
+            self.load_write_pc(self.memory.read_mem_a(address, 4).unwrap_or_default());
+        }
+        if wback && !bitset(registers, rn) {
+            self.write_reg(rn, self.read_reg(rn) - 4 * registers.count_ones());
         }
     }
 
@@ -1354,7 +1378,7 @@ impl Board {
         let rn = data >> 12;
         let imm32 = (data & 0xFF) << 2;
         let address = self.read_reg(rn).wrapping_add(imm32);
-        self.write_reg(rt, self.memory.read_word(address).unwrap());
+        self.write_reg(rt, self.memory.read_word(address).unwrap_or_default());
     }
 
     fn w_ldr_imm(&mut self, data: u32, extra: u32) {
@@ -1366,7 +1390,7 @@ impl Board {
 
         let offset_address = self.read_reg(rn).wrapping_add(sign_extend(extra, 12));
         let address = if index { offset_address } else { self.read_reg(rn) };
-        let data = self.memory.read_word(address).unwrap();
+        let data = self.memory.read_word(address).unwrap_or_default();
         if wback { self.write_reg(rn, offset_address); }
         if rt == 15 {
             if (address & 0b11) == 0 {
@@ -1383,7 +1407,7 @@ impl Board {
         let rt = data >> 10;
         let imm10 = data & 0x3FF;
         let address = word_align(self.read_pc()).wrapping_add(imm10);
-        let value = self.memory.read_word(address).unwrap();
+        let value = self.memory.read_word(address).unwrap_or_default();
         if rt == 15 {
             if (address & 0b11) == 0 {
                 self.load_write_pc(value);
@@ -1399,7 +1423,7 @@ impl Board {
         // A7.7.44
         let rt = data;
         let address = word_align(self.read_pc()).wrapping_add(sign_extend(extra, 12));
-        let data = self.memory.read_word(address).unwrap(); // TODO: Proper error handling
+        let data = self.memory.read_word(address).unwrap_or_default(); // TODO: Proper error handling
         if rt == 15 {
             if (address & 0b11) == 0 {
                 self.load_write_pc(data);
@@ -1417,7 +1441,7 @@ impl Board {
         let rn = (data >> 3) & 0b111;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        let value = self.memory.read_word(address).unwrap();
+        let value = self.memory.read_word(address).unwrap_or_default();
         self.write_reg(rt, value);
     }
 
@@ -1449,7 +1473,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let imm5 = data >> 6;
         let address = self.read_reg(rn).wrapping_add(imm5);
-        let loaded = self.memory.read_mem_u(address, 1).unwrap();
+        let loaded = self.memory.read_mem_u(address, 1).unwrap_or_default();
         self.write_reg(rt, loaded);
     }
 
@@ -1459,7 +1483,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        let loaded = self.memory.read_mem_u(address, 1).unwrap();
+        let loaded = self.memory.read_mem_u(address, 1).unwrap_or_default();
         self.write_reg(rt, loaded);
     }
 
@@ -1480,7 +1504,7 @@ impl Board {
         let rt = (data >> 6) & 0x7;
         let rn = data >> 9;
         let address = self.read_reg(rn).wrapping_add(imm6);
-        let loaded = self.memory.read_mem_u(address, 2).unwrap();
+        let loaded = self.memory.read_mem_u(address, 2).unwrap_or_default();
         self.write_reg(rt, loaded);
     }
 
@@ -1490,7 +1514,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        let loaded = self.memory.read_mem_u(address, 2).unwrap();
+        let loaded = self.memory.read_mem_u(address, 2).unwrap_or_default();
         self.write_reg(rt, loaded);
     }
 
@@ -1500,7 +1524,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        let loaded = self.memory.read_mem_u(address, 1).unwrap();
+        let loaded = self.memory.read_mem_u(address, 1).unwrap_or_default();
         self.write_reg(rt, sign_extend(loaded, 7));
     }
 
@@ -1510,7 +1534,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        let loaded = self.memory.read_mem_u(address, 2).unwrap();
+        let loaded = self.memory.read_mem_u(address, 2).unwrap_or_default();
         self.write_reg(rt, sign_extend(loaded, 15));
     }
 
@@ -2210,7 +2234,7 @@ impl Board {
         let mut address = self.read_reg(rn);
         for i in 0..=7u32 {
             if bitset(registers, i) {
-                self.memory.write_word(address, self.read_reg(i)).unwrap();
+                self.memory.write_word(address, self.read_reg(i)).unwrap_or_default();
                 address += 4;
             }
         }
@@ -2224,12 +2248,30 @@ impl Board {
         let mut address = self.read_reg(rn);
         for i in 0..=14u32 {
             if bitset(registers, i) {
-                self.memory.write_word(address, self.read_reg(i)).unwrap();
+                self.memory.write_word(address, self.read_reg(i)).unwrap_or_default();
                 address += 4;
             }
         }
         if bitset(extra, 16) {
             self.write_reg(rn, address);
+        }
+    }
+
+    fn w_stmdb(&mut self, data: u32, extra: u32) {
+        // A7.7.160
+        let rn = data;
+        let registers = extra & 0xFFFF;
+        let wback = bitset(extra, 16);
+
+        let mut address = self.read_reg(rn) - 4 * registers.count_ones();
+        for i in 0..=14u32 {
+            if bitset(registers, i) {
+                self.memory.write_mem_a(address, 4, self.read_reg(i)).unwrap_or_default();
+                address += 4;
+            }
+        }
+        if wback {
+            self.write_reg(rn, self.read_reg(rn) - 4 * registers.count_ones());
         }
     }
 
@@ -2239,7 +2281,7 @@ impl Board {
         let rt = (data >> 8) & 0xF;
         let rn = data >> 12;
         let address = self.read_reg(rn).wrapping_add(imm32);
-        self.memory.write_word(address, self.read_reg(rt)).unwrap();
+        self.memory.write_word(address, self.read_reg(rt)).unwrap_or_default();
     }
 
     fn w_str_imm(&mut self, data: u32, extra: u32) {
@@ -2251,7 +2293,7 @@ impl Board {
         let index = bitset(extra, 14);
         let wback = bitset(extra, 13);
         let address = if index { offset_address } else { rn_val };
-        self.memory.write_word(address, self.read_reg(rt)).unwrap();
+        self.memory.write_word(address, self.read_reg(rt)).unwrap_or_default();
         if wback {
             self.write_reg(rn, offset_address);
         }
@@ -2263,7 +2305,7 @@ impl Board {
         let rn = (data >> 3) & 0b111;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        self.memory.write_mem_u(address, 4, self.read_reg(rt)).unwrap();
+        self.memory.write_mem_u(address, 4, self.read_reg(rt)).unwrap_or_default();
     }
 
     fn w_str_reg(&mut self, data: u32, extra: u32) {
@@ -2284,7 +2326,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let imm5 = data >> 6;
         let address = self.read_reg(rn).wrapping_add(imm5);
-        self.memory.write_mem_u(address, 1, self.read_reg(rt)).unwrap();
+        self.memory.write_mem_u(address, 1, self.read_reg(rt)).unwrap_or_default();
     }
 
     fn n_strb_reg(&mut self, data: u32) {
@@ -2293,7 +2335,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        self.memory.write_mem_u(address, 1, self.read_reg(rt)).unwrap();
+        self.memory.write_mem_u(address, 1, self.read_reg(rt)).unwrap_or_default();
     }
 
     fn w_strex(&mut self, data: u32, extra: u32) {
@@ -2318,7 +2360,7 @@ impl Board {
         let rt = (data >> 3) & 0x7;
         let rn = data >> 6;
         let address = self.read_reg(rn).wrapping_add(imm6);
-        self.memory.write_mem_u(address, 2, self.read_reg(rt)).unwrap();
+        self.memory.write_mem_u(address, 2, self.read_reg(rt)).unwrap_or_default();
     }
 
     fn n_strh_reg(&mut self, data: u32) {
@@ -2327,7 +2369,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        self.memory.write_mem_u(address, 2, self.read_reg(rt)).unwrap();
+        self.memory.write_mem_u(address, 2, self.read_reg(rt)).unwrap_or_default();
     }
 
     fn n_sub_imm(&mut self, data: u32) {
