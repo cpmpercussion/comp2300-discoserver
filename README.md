@@ -28,7 +28,7 @@ cargo build
         "executable": "${workspaceRoot}/.pio/build/disco_l476vg/firmware.elf",
         "servertype": "qemu",
         "preLaunchTask": "PlatformIO: Build",
-        "serverpath": "/abs/path/to/comp2300-disco-emulator/target/debug/arm-emulator",
+        "serverpath": "/abs/path/to/comp2300-disco-emulator/target/debug/discoserver",
         "postLaunchCommands": [
             "-break-insert main"
         ]
@@ -48,7 +48,7 @@ cargo build
     debug_tool = custom
     debug_port = localhost:50030; or whatever port you want. Fix the corresponding debug_server arg if changed.
     debug_server =
-        /abs/path/to/comp2300-disco-emulator/target/debug/arm-emulator
+        /abs/path/to/comp2300-disco-emulator/target/debug/discoserver
         tcp::50030
         ; --audio; uncomment to enable audio
         -kernel
