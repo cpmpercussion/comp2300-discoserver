@@ -1,5 +1,5 @@
 mod packet;
-use packet::{hex_to_word, word_to_hex, validate_packet, is_hex_char, hex_to_byte, get_checksum_hex, get_u8_from_hex, leading_alpha};
+use packet::{hex_to_word, word_to_hex, validate_packet, get_checksum_hex, get_u8_from_hex, leading_alpha};
 
 mod query;
 use query::{Query, Set};
@@ -7,15 +7,13 @@ use query::{Query, Set};
 use std::collections::{HashSet, VecDeque};
 use std::env;
 use std::ffi::{OsString};
-use std::error::Error;
-use std::fs::File;
 use std::io::prelude::*;
-use std::io::{stdin, stdout, Read};
+use std::io::{Read};
 use std::net::{TcpStream, TcpListener, Shutdown};
-use std::path::{PathBuf, Path};
+use std::path::{PathBuf};
 use std::vec;
 
-use crate::Board;
+use disco_emulator::Board;
 
 #[derive(Debug)]
 enum PacketState {
