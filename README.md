@@ -66,3 +66,8 @@ cargo build
 - `src/main.rs`: The entry point of the `discoserver` executable. Wraps the `disco_emulator` library in a GDB remote protocol compatible server.
 - `disco_emulator/src/lib.rs`: The entry point for the emulator itself.
 - `tests/*`: Tests for the emulator.
+
+
+### Tests
+
+Run the tests with `cargo test`. Typically each test compiles a corresponding program using `arm-none-eabi-as` and `arm-none-eabi-ld`, so make sure these are on your PATH (PlatformIO bundles these in `.platformio/packages/toolchain-gccarmnoneeabi/bin`). It then steps through, checking registers and flags for correct values.

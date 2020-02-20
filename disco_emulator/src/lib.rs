@@ -1701,6 +1701,7 @@ impl Board {
 
         let result = self.read_reg(rm);
         if rd == 15 {
+            println!("alu writing pc {}", result);
             self.alu_write_pc(result);
         } else {
             self.write_reg(rd, result);
