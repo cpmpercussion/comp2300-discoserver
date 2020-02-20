@@ -185,11 +185,11 @@ fn id_data_processing_shifted_register(word: u32, c: Context) -> ByteInstruction
                     base
                 } else {
                     let opcode = match shift_t {
-                        0b00 => Opcode::LslImm,
+                        0b00 => Opcode::LslImm, // A7.7.68 T2
                         0b01 => Opcode::LsrImm,
-                        0b10 => Opcode::AsrImm,
-                        0b11 if shift_n == 0 => Opcode::Rrx,
-                        0b11 if shift_n != 0 => Opcode::RorImm,
+                        0b10 => Opcode::AsrImm, // A7.7.10 T2
+                        0b11 if shift_n == 0 => Opcode::Rrx, // A7.7.118 T1
+                        0b11 if shift_n != 0 => Opcode::RorImm, // A7.7.116 T1
                         _ => unreachable!(),
                     };
                     let mut base = tag::get_wide(opcode, c, rd | rm << 4 | (setflags as u32) << 8, shift_n);
@@ -1027,7 +1027,6 @@ fn id_data_proc_register(word: u32, c: Context) -> ByteInstruction {
     let s = (word >> 20) & 0b1;
 
     if (op1 == 0b0000 || op1 == 0b0001) && op2 == 0b0000 {
-        // LSL (reg)
         let mut base = tag::get_wide(Opcode::LslReg, c, rd | rn << 4 | s << 8, rm); // A7.7.69 T2
         if (rd == 13 || rd == 15) || (rn == 13 || rn == 15) || (rm == 13 || rm == 15) {
             base = tag::as_unpred_w(base);
@@ -1036,7 +1035,6 @@ fn id_data_proc_register(word: u32, c: Context) -> ByteInstruction {
     }
 
     if (op1 == 0b0010 || op1 == 0b0011) && op2 == 0b0000 {
-        // LSR (reg)
         let mut base = tag::get_wide(Opcode::LsrReg, c, rd | rn << 4 | s << 8, rm); // A7.7.71 T2
         if (rd == 13 || rd == 15) || (rn == 13 || rn == 15) || (rm == 13 || rm == 15) {
             base = tag::as_unpred_w(base);
@@ -1045,7 +1043,6 @@ fn id_data_proc_register(word: u32, c: Context) -> ByteInstruction {
     }
 
     if (op1 == 0b0100 || op1 == 0b0101) && op2 == 0b0000 {
-        // ASR (reg)
         let mut base = tag::get_wide(Opcode::AsrReg, c, rd | rn << 4 | s << 8, rm); // A7.7.11 T2
         if (rd == 13 || rd == 15) || (rn == 13 || rn == 15) || (rm == 13 || rm == 15) {
             base = tag::as_unpred_w(base);
@@ -1054,7 +1051,6 @@ fn id_data_proc_register(word: u32, c: Context) -> ByteInstruction {
     }
 
     if (op1 == 0b0110 || op1 == 0b0111) && op2 == 0b0000 {
-        // ROR (reg)
         let mut base = tag::get_wide(Opcode::RorReg, c, rd | rn << 4 | s << 8, rm); // A7.7.117 T2
         if (rd == 13 || rd == 15) || (rn == 13 || rn == 15) || (rm == 13 || rm == 15) {
             base = tag::as_unpred_w(base);

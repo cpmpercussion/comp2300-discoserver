@@ -11,7 +11,7 @@ pub enum Opcode {
     Adr,    // N: blank[3]-rd[3]-offset[10] / W: blank[12]-rd[4]- + blank[17]-sign[1]-imm12[12]
     AndImm, // W: blank[3]-setflags[1]-rn[4]-rd[4]-spill[4] + modified[30]
     AndReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[22]-shift_n[6]-shift_t[2]
-    AsrImm, // N: blank[5]-shift[5]-rm[3]-rd[3] / W: blank[11]-setflags[1]-rm[4]-rd[4] + blank[24]-shift_n[6]
+    AsrImm, // N: blank[4]-shift[6]-rm[3]-rd[3] / W: blank[11]-setflags[1]-rm[4]-rd[4] + blank[24]-shift_n[6]
     AsrReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[7]-setflags[1]-rn[4]-rd[4] + blank[26]-rm[4]
     Branch, // N: blank[5]-imm11[11] / W: blank[16] + blank[6]-imm24[24]
     BranchCond, // N: blank[4]-cond[4]-imm8[4] / W: blank[12]-cond[4] + blank[10]-imm20[20]
@@ -60,7 +60,7 @@ pub enum Opcode {
     Ldrt,   // W: blank[8]-rn[4]-rt[4] + blank[22]-imm8[8]
     LslImm, // N: blank[5]-shift[5]-rm[3]-rd[3] / W: blank[7]-setflags[1]-rm[4]-rd[4] + blank[24]-shift_n[6]
     LslReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[7]-setflags[1]-rn[4]-rd[4] + blank[26]-rm[4]
-    LsrImm, // N: blank[5]-shift[5]-rm[3]-rd[3]
+    LsrImm, // N: blank[4]-shift[6]-rm[3]-rd[3]
     LsrReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[7]-setflags[1]-rn[4]-rd[4] + blank[26]-rm[4]
     Mcr,    // W: --unparsed--
     Mcrr,   // W: --unparsed--
