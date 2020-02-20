@@ -29,11 +29,10 @@ SECTIONS {
   .data : {
     . = ALIGN(4);
     _data_start_ram = .;
-    KEEP(*(.data)) /* NOTE: KEEP is helpful to prevent it discarding unused labels when --gc-sections is passed */
+    KEEP(*(.data))
     . = ALIGN(4);
     _data_end_ram = .;
   } > RAM AT > FLASH
-
 
   .bss : {
     . = ALIGN(4);

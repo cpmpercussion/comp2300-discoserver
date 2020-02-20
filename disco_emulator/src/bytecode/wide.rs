@@ -780,8 +780,12 @@ fn thumb_expand_imm_c_alt(word: u32) -> (u32, u32) {
             _ => unreachable!(),
         };
     } else {
-        let encoded_shift = (word & (1 << 26)) >> 21 | (word & (0b111 << 12)) >> 11 | (word & (1 << 7)) >> 7;
-        full = base << (0x20 - encoded_shift);
+        let i = (word >> 26) & 0b1;
+        let imm3 = (word >> 12) & 0b111;
+        let a = (word >> 7) & 0b1;
+        let encoded_shift = a | imm3 << 1 | i << 4;
+
+        full = (base | 1 << 7) << (0x20 - encoded_shift);
         spill |= 0b1000;
         if bitset(full, 31) {
             spill |= 0b0100;

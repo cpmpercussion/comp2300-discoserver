@@ -160,6 +160,14 @@ pub enum ExecMode {
     ModeHandler,
 }
 
+pub struct Flags {
+    pub n: bool,
+    pub z: bool,
+    pub c: bool,
+    pub v: bool,
+    pub q: bool,
+}
+
 #[derive(Debug)]
 pub struct CPU {
     registers: [u32; 16],
@@ -335,6 +343,16 @@ impl CPU {
         let ipsr = self.ipsr.exception & 0x1FF;
 
         return apsr | epsr | ipsr;
+    }
+
+    pub fn get_flags(&self) -> Flags {
+        return Flags {
+            n: self.apsr.n,
+            z: self.apsr.z,
+            c: self.apsr.c,
+            v: self.apsr.v,
+            q: self.apsr.q,
+        }
     }
 }
 

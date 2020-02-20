@@ -162,7 +162,7 @@ impl MemoryBus {
     fn new() -> MemoryBus {
         return MemoryBus {
             flash: vec![0xFF; 1024 * 1024].into_boxed_slice(),
-            data: vec![0xFF; 128 * 1024].into_boxed_slice(), 
+            data: vec![0xFF; 128 * 1024].into_boxed_slice(),
             peripherals: Peripherals::new(),
         };
     }

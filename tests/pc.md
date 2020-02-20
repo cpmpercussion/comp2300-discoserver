@@ -24,3 +24,9 @@ mov PC, r0 @ 2byte
 
 ### SP value
 - POP with SP is unpredictable, and does not get recognised (instruction executes as if SP bit is false)
+
+
+### Compile steps:
+
+- arm-none-eabi-as -mthumb -mcpu=cortex-m4 -o main.o main.s
+- arm-none-eabi-ld -T ../../common/linker.ld -nostartfiles -o firmware.elf main.o
