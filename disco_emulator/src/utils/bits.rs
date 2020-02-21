@@ -92,12 +92,9 @@ pub fn lsr_c(input: u32, shift: u32) -> (u32, bool) {
     return (result, carry_out);
 }
 
-pub fn asr_c(input: u32, shift: u32) -> (u32, bool) {
+pub fn asr_c(input: u32, mut shift: u32) -> (u32, bool) {
     // p27
-    let shift = match shift {
-        0..=31 => shift,
-        _ => 31,
-    };
+    if shift >= 32 { shift = 31; } // safe, because 32 shift == 31 shift with ASR
     let result = ((input as i32) >> shift) as u32;
     let carry_out = bitset(input, shift - 1);
     return (result, carry_out);
