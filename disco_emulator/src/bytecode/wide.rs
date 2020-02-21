@@ -1258,7 +1258,7 @@ fn id_load_half_word(word: u32, c: Context) -> ByteInstruction {
 
 // imm12 -> negate and mask to imm13
 fn get_negated_simm13(imm12: u32) -> u32 {
-    return (!(imm12 & 0xFFF) + 1) & 0x1FFF;
+    return ((!(imm12 & 0xFFF)).wrapping_add(1)) & 0x1FFF;
 }
 
 fn msk(value: u32, mask: u32, expected: u32) -> bool {

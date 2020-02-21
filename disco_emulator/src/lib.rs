@@ -155,6 +155,10 @@ fn read_value(bank: &[u8], base: usize, size: usize) -> Result<u32, String> {
 
 fn write_value(mut value: u32, bank: &mut[u8], base: usize, size: usize) -> Result<(), String> {
     assert!(size == 1 || size == 2 || size == 4);
+    if base + size > bank.len() {
+        return Err("out of bounds".to_string());
+    }
+
     for i in 0..size {
         bank[base + i] = (value & 0xFF) as u8;
         value = value >> 8;
@@ -411,6 +415,16 @@ impl Board {
 
     fn read_word(&self, address: u32) -> u32 {
         return self.read_mem_u(address, 4);
+    }
+
+    fn write_word(&mut self, address: u32, value: u32) {
+        self.write_mem_u(address, 4, value);
+    }
+
+    fn write_mem_u(&mut self, address: u32, size: usize, value: u32) {
+        if let Err(e) = self.memory.write_mem_u(address, size, value) {
+            self.pending_default_handler.set(true);
+        }
     }
 
     /**
@@ -1980,12 +1994,12 @@ impl Board {
         let mut address = self.read_sp();
         if bitset(data, 8) {
             address -= 4;
-            self.memory.write_word(address, self.read_lr()).unwrap_or_default();
+            self.write_word(address, self.read_lr());
         }
         for i in (0..8u32).rev() {
             if bitset(data, i) {
                 address -= 4;
-                self.memory.write_word(address, self.read_reg(i)).unwrap_or_default();
+                self.write_word(address, self.read_reg(i));
             }
         }
         self.write_sp(address);
@@ -1999,13 +2013,13 @@ impl Board {
         if single_mode {
             let rt = extra;
             address -= 4;
-            self.memory.write_mem_u(address, 4, self.read_reg(rt)).unwrap_or_default();
+            self.write_mem_u(address, 4, self.read_reg(rt));
         } else {
             let registers = data & 0xFFFF;
             for i in (0..=14u32).rev() {
                 if bitset(registers, i) {
                     address -= 4;
-                    self.memory.write_mem_u(address, 4, self.read_reg(i)).unwrap_or_default();
+                    self.write_mem_u(address, 4, self.read_reg(i));
                 }
             }
         }
@@ -2266,7 +2280,7 @@ impl Board {
         let mut address = self.read_reg(rn);
         for i in 0..=7u32 {
             if bitset(registers, i) {
-                self.memory.write_word(address, self.read_reg(i)).unwrap_or_default();
+                self.write_word(address, self.read_reg(i));
                 address += 4;
             }
         }
@@ -2280,7 +2294,7 @@ impl Board {
         let mut address = self.read_reg(rn);
         for i in 0..=14u32 {
             if bitset(registers, i) {
-                self.memory.write_word(address, self.read_reg(i)).unwrap_or_default();
+                self.write_word(address, self.read_reg(i));
                 address += 4;
             }
         }
@@ -2313,7 +2327,7 @@ impl Board {
         let rt = (data >> 8) & 0xF;
         let rn = data >> 12;
         let address = self.read_reg(rn).wrapping_add(imm32);
-        self.memory.write_word(address, self.read_reg(rt)).unwrap_or_default();
+        self.write_word(address, self.read_reg(rt));
     }
 
     fn w_str_imm(&mut self, data: u32, extra: u32) {
@@ -2325,7 +2339,7 @@ impl Board {
         let index = bitset(extra, 14);
         let wback = bitset(extra, 13);
         let address = if index { offset_address } else { rn_val };
-        self.memory.write_word(address, self.read_reg(rt)).unwrap_or_default();
+        self.write_word(address, self.read_reg(rt));
         if wback {
             self.write_reg(rn, offset_address);
         }
@@ -2337,7 +2351,7 @@ impl Board {
         let rn = (data >> 3) & 0b111;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        self.memory.write_mem_u(address, 4, self.read_reg(rt)).unwrap_or_default();
+        self.write_mem_u(address, 4, self.read_reg(rt));
     }
 
     fn w_str_reg(&mut self, data: u32, extra: u32) {
@@ -2348,7 +2362,7 @@ impl Board {
         let imm2 = extra >> 4;
         let (offset, _) = bits::lsl_c(self.read_reg(rm), imm2);
         let address = self.read_reg(rn).wrapping_add(offset);
-        self.memory.write_mem_u(address, 4, self.read_reg(rt)).unwrap_or_default();
+        self.write_mem_u(address, 4, self.read_reg(rt));
     }
 
     fn n_strb_imm(&mut self, data: u32) {
@@ -2357,7 +2371,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let imm5 = data >> 6;
         let address = self.read_reg(rn).wrapping_add(imm5);
-        self.memory.write_mem_u(address, 1, self.read_reg(rt)).unwrap_or_default();
+        self.write_mem_u(address, 1, self.read_reg(rt));
     }
 
     fn n_strb_reg(&mut self, data: u32) {
@@ -2366,7 +2380,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        self.memory.write_mem_u(address, 1, self.read_reg(rt)).unwrap_or_default();
+        self.write_mem_u(address, 1, self.read_reg(rt));
     }
 
     fn w_strex(&mut self, data: u32, extra: u32) {
@@ -2391,7 +2405,7 @@ impl Board {
         let rt = (data >> 3) & 0x7;
         let rn = data >> 6;
         let address = self.read_reg(rn).wrapping_add(imm6);
-        self.memory.write_mem_u(address, 2, self.read_reg(rt)).unwrap_or_default();
+        self.write_mem_u(address, 2, self.read_reg(rt));
     }
 
     fn n_strh_reg(&mut self, data: u32) {
@@ -2400,7 +2414,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        self.memory.write_mem_u(address, 2, self.read_reg(rt)).unwrap_or_default();
+        self.write_mem_u(address, 2, self.read_reg(rt));
     }
 
     fn n_sub_imm(&mut self, data: u32) {

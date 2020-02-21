@@ -289,3 +289,78 @@ fn str() {
         assert!(false);
     }
 }
+
+#[test]
+fn ldr() {
+    let mut board = load_program("ldr").unwrap();
+
+    let mut i = 0;
+    while board.read_reg(5u32) != 1 {
+        i += 1;
+        if i > 100_000 {
+            panic!("Expected iterations to finish");
+        };
+        board.step().unwrap();
+    }
+    board.step().unwrap();
+
+    for i in (0x2000_0000..0x2001_8000).step_by(4) {
+        match board.memory.read_mem_u(i, 4) {
+            Ok(v) => {
+                if v != i - 0x2000_0000 {
+                    println!("incorrect memory value: expected {}, got {}", i - 0x2000_0000, v);
+                    assert!(false);
+                }
+            },
+            Err(e) => {
+                println!("Failed to read word at {}: {}", i, e);
+                assert!(false);
+            }
+        };
+    }
+
+    // LDR (imm) T1
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.read_reg(1u32), 124);
+
+    // LDR (imm) T2
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.read_reg(1u32), 1020);
+
+    // LDR (imm) T3
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.read_reg(1u32), 4092);
+    assert_eq!(board.read_reg(2u32), 0x0010_0000); // verified against real board w/ offset 4095
+
+    // LDR (imm) T4
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.read_reg(1u32), 0);
+    assert_eq!(board.read_reg(0u32), 0x2000_0000);
+
+    // LDR (reg) T1
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.read_reg(2u32), 0x1777C);
+
+    // LDR (reg) T2
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.read_reg(2u32), 16);
+
+    // LDR (lit) T1
+    board.step().unwrap();
+    assert_eq!(board.read_reg(0u32), 0xDEADBEE1);
+
+    // LDR (lit) T2
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.read_reg(0u32), 0xDEADBEE1);
+    assert_eq!(board.read_reg(1u32), 0xDEADBEE2);
+}
