@@ -80,20 +80,24 @@ pub fn rrx(input: u32, carry_in: u32) -> u32 {
 
 pub fn lsl_c(input: u32, shift: u32) -> (u32, bool) {
     // p26
-    let result = input << shift;
+    let result = input.checked_shl(shift).unwrap_or(0);
     let carry_out = bitset(input, 32 - shift);
     return (result, carry_out);
 }
 
 pub fn lsr_c(input: u32, shift: u32) -> (u32, bool) {
     // p26
-    let result = input >> shift;
+    let result = input.checked_shr(shift).unwrap_or(0);
     let carry_out = bitset(input, shift - 1);
     return (result, carry_out);
 }
 
 pub fn asr_c(input: u32, shift: u32) -> (u32, bool) {
     // p27
+    let shift = match shift {
+        0..=31 => shift,
+        _ => 31,
+    };
     let result = ((input as i32) >> shift) as u32;
     let carry_out = bitset(input, shift - 1);
     return (result, carry_out);
