@@ -196,8 +196,8 @@ fn mov() {
 }
 
 #[test]
-fn ldr_str() {
-    let mut board = load_program("ldrstr").unwrap();
+fn str() {
+    let mut board = load_program("str").unwrap();
 
     // STR (imm) T4
     let mut i = 0;
@@ -208,6 +208,7 @@ fn ldr_str() {
         };
         board.step().unwrap();
     }
+    board.step().unwrap();
 
     let test_val = 0x32A7F092;
     for i in (0x2000_0000..0x2001_8000).step_by(4) {
@@ -225,5 +226,66 @@ fn ldr_str() {
         };
     }
 
-    
+    // STR (imm) T1
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    if let Ok(v) = board.memory.read_mem_u(0x2000_0000 + 124, 4) {
+        assert_eq!(v, 0xDEADBEE1);
+    } else {
+        assert!(false);
+    }
+
+    // STR (imm) T2
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    if let Ok(v) = board.memory.read_mem_u(0x2000_0000 + 1020, 4) {
+        assert_eq!(v, 0xDEADBEE2);
+    } else {
+        assert!(false);
+    }
+
+    // STR (imm) T3
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    if let Ok(v) = board.memory.read_mem_u(0x2000_0000 + 4095, 4) {
+        assert_eq!(v, 0xDEADBEE3);
+    } else {
+        assert!(false);
+    }
+
+    // STR (imm) T4
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    if let Ok(v) = board.memory.read_mem_u(0x2000_0001, 4) {
+        assert_eq!(v, 0xDEADBEE4);
+    } else {
+        assert!(false);
+    }
+    assert_eq!(board.read_reg(10u32), 0x2000_0001);
+
+    // STR (reg) T1
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    if let Ok(v) = board.memory.read_mem_u(0x2000_0000 + 12, 4) {
+        assert_eq!(v, 0xDEADBEE5);
+    } else {
+        assert!(false);
+    }
+
+    // STR (reg) T2
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    board.step().unwrap();
+    if let Ok(v) = board.memory.read_mem_u(0x2000_0000 + (12 << 3), 4) {
+        assert_eq!(v, 0xDEADBEE6);
+    } else {
+        assert!(false);
+    }
 }

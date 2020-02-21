@@ -2345,8 +2345,7 @@ impl Board {
         let rt = data & 0xF;
         let rn = data >> 4;
         let rm = extra & 0xF;
-        let imm2 = extra >> 2;
-
+        let imm2 = extra >> 4;
         let (offset, _) = bits::lsl_c(self.read_reg(rm), imm2);
         let address = self.read_reg(rn).wrapping_add(offset);
         self.memory.write_mem_u(address, 4, self.read_reg(rt)).unwrap_or_default();
