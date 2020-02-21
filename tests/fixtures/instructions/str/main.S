@@ -47,5 +47,4 @@ main:
   mov r1, 12
   ldr r2, =0xDEADBEE6
   str.W r2, [r0, r1, LSL 3]
-
 .size main, . - main

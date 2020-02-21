@@ -29,6 +29,4 @@ main:
   @ PUSH T3
   ldr sp, =(_stack_end - 1)
   push.W {lr}
-
-  bx lr
 .size main, . - main

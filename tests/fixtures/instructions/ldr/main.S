@@ -54,8 +54,6 @@ main:
   @ LDR (lit) T2
   ldr.W r0, lit_forward
   ldr.W r1, lit_back
-
-  bx lr
 .size main, . - main
 
 .align 4
