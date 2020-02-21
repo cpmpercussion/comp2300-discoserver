@@ -142,6 +142,7 @@ impl fmt::Debug for MemoryBus {
 fn read_value(bank: &[u8], base: usize, size: usize) -> Result<u32, String> {
     assert!(size == 1 || size == 2 || size == 4);
     if base + size > bank.len() {
+        println!("{} + {} > {}", base, size, bank.len());
         return Err("out of bounds".to_string());
     }
 
@@ -2011,11 +2012,12 @@ impl Board {
         let mut address = self.read_sp();
 
         if single_mode {
+            // TODO: When does "UnalignedAllowed = TRUE;" matter? SP is enforced word aligned by default
             let rt = extra;
             address -= 4;
             self.write_mem_u(address, 4, self.read_reg(rt));
         } else {
-            let registers = data & 0xFFFF;
+            let registers = extra & 0xFFFF;
             for i in (0..=14u32).rev() {
                 if bitset(registers, i) {
                     address -= 4;

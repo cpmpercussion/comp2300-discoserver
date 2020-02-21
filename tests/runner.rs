@@ -364,3 +364,37 @@ fn ldr() {
     assert_eq!(board.read_reg(0u32), 0xDEADBEE1);
     assert_eq!(board.read_reg(1u32), 0xDEADBEE2);
 }
+
+#[test]
+fn push() {
+    let mut board = load_and_step("push", 14).unwrap();
+
+    // PUSH T1
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 4, 4).unwrap(), 14);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 8, 4).unwrap(), 7);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 12, 4).unwrap(), 3);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 16, 4).unwrap(), 0);
+
+    // PUSH T2
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 4, 4).unwrap(), 14);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 8, 4).unwrap(), 12);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 12, 4).unwrap(), 11);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 16, 4).unwrap(), 10);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 20, 4).unwrap(), 8);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 24, 4).unwrap(), 7);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 28, 4).unwrap(), 6);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 32, 4).unwrap(), 5);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 36, 4).unwrap(), 4);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 40, 4).unwrap(), 3);
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 44, 4).unwrap(), 2);
+
+    // PUSH T3
+    board.step().unwrap();
+    assert_eq!(board.read_sp(), 0x2001_7FFC); // The stack pointer lower bits are cleared
+    board.step().unwrap();
+    assert_eq!(board.memory.read_mem_u(0x2001_8000 - 8, 4).unwrap(), 14);
+}
