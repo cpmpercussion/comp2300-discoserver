@@ -115,7 +115,7 @@ impl Condition {
             0b1101 => Condition::SLowerSame,
             0b1110 => Condition::Always,
             0b1111 => Condition::Never,
-            _ => panic!(),
+            _ => unreachable!(),
         };
     }
 }
@@ -194,32 +194,6 @@ impl MemoryBus {
         return Ok(());
     }
 
-    fn print_mem_dump(&self, address: u32, length: usize) {
-        // let mut c = 16;
-        // for i in address..(address + (length as u32) * 4) {
-        //     if c == 0 {
-        //         c = 16;
-        //         print!("\n");
-        //     }
-        //     c -= 1;
-        //     let val = match self.read_byte(i) {
-        //         Ok(v) => v,
-        //         Err(e) => {
-        //             println!("{}", e);
-        //             return;
-        //         }
-        //     };
-        //     print!("{:02X} ", val);
-        // }
-        // print!("\n");
-    }
-
-    fn print_mem_area(&self, address: u32) {
-        let padding = "   ".repeat((address & 0xF) as usize);
-        // println!("{}v{:#010X}", padding.to_string(), address);
-        self.print_mem_dump(address & !0xF, 0x8);
-    }
-
     fn get_instr_word(&self, address: u32) -> Result<u32, String> {
         if 0x0800_0000 <= address && address <= 0x0800_0000 + (self.flash.len() as u32) {
             let base = (address - 0x0800_0000) as usize;
@@ -240,10 +214,12 @@ impl MemoryBus {
 
     fn read_mem_a_with_priv(&self, address: u32, size: usize, _access_type: &AccessType) -> Result<u32, String> {
         // B2.3.4 p583
-        // if address != align(address, size as u32) {
-        //     // Set UFSR.UNALIGNED = true;
-        //     panic!("UsageFault");
-        // }
+        if address != align(address, size as u32) {
+            // Set UFSR.UNALIGNED = true;
+            println!("UsageFault: unaligned memory access");
+            let hard_fault_handler = read_value(&*self.flash, 4 * 3, 4);
+            return Err("unaligned memory access".to_string());
+        }
 
         // let memaddrdesc = validate_address(address, access_type, false); // TODO
         let location = self.address_to_physical(address)?;
@@ -290,7 +266,6 @@ impl MemoryBus {
     }
 
     fn read_word(&self, address: u32) -> Result<u32, String> {
-        self.print_mem_area(address);
         return self.read_mem_u(address, 4);
     }
 
@@ -311,9 +286,7 @@ impl MemoryBus {
         return match location {
             Location::Flash(_) => Err(String::from("Cannot write to Flash memory")),
             Location::Ram(i) => {
-                let r = write_value(value, &mut *self.data, i, size);
-                self.print_mem_area(address);
-                r
+                write_value(value, &mut *self.data, i, size)
             }
             Location::Peripheral(_) => self.peripherals.write(address, value, size),
         }
@@ -658,10 +631,6 @@ impl Board {
         return Ok(());
     }
 
-    fn print_mem_dump(&mut self, index: u32, length: usize) {
-        self.memory.print_mem_dump(index, length);
-    }
-
     pub fn read_memory_region(&self, start: u32, bytes: u32) -> Result<Vec<u8>, String> {
         let mut out = Vec::new();
         for i in start..(start.saturating_add(bytes)) {
@@ -685,10 +654,6 @@ impl Board {
             };
         }
         return Ok(());
-    }
-
-    fn print_mem_area(&mut self, address: u32) {
-        self.memory.print_mem_area(address);
     }
 
     pub fn read_reg<T: Into<u32>>(&self, reg: T) -> u32 {
