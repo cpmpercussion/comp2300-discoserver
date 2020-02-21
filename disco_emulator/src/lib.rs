@@ -127,7 +127,7 @@ pub enum Location {
     Peripheral(u32), // we keep the passed address, and resolve in more detail
 }
 
-struct MemoryBus {
+pub struct MemoryBus {
     flash: Box<[u8]>,
     data: Box<[u8]>,
     peripherals: Peripherals
@@ -141,6 +141,10 @@ impl fmt::Debug for MemoryBus {
 
 fn read_value(bank: &[u8], base: usize, size: usize) -> Result<u32, String> {
     assert!(size == 1 || size == 2 || size == 4);
+    if base + size > bank.len() {
+        return Err("out of bounds".to_string());
+    }
+
     let mut result: u32 = 0;
     for i in (0..size).rev() {
         result = result << 8;
@@ -162,7 +166,7 @@ impl MemoryBus {
     fn new() -> MemoryBus {
         return MemoryBus {
             flash: vec![0xFF; 1024 * 1024].into_boxed_slice(),
-            data: vec![0xFF; 128 * 1024].into_boxed_slice(),
+            data: vec![0xFF; 0x18000].into_boxed_slice(),
             peripherals: Peripherals::new(),
         };
     }
@@ -204,7 +208,7 @@ impl MemoryBus {
             return Ok((b2 << 24) + (b1 << 16) + (b4 << 8) + b3);
         }
 
-        return Err(String::from("Out of bounds access"));
+        return Err(format!("Out of bounds access for instruction address 0x{:08X}", address));
     }
 
     fn read_mem_a(&self, address: u32, size: usize) -> Result<u32, String> {
@@ -230,7 +234,7 @@ impl MemoryBus {
         };
     }
 
-    fn read_mem_u(&self, address: u32, size: usize) -> Result<u32, String> {
+    pub fn read_mem_u(&self, address: u32, size: usize) -> Result<u32, String> {
         // B2.3.5 p584
         return self.read_mem_u_with_priv(address, size, &AccessType::Normal);
     }
@@ -241,7 +245,7 @@ impl MemoryBus {
             return self.read_mem_a_with_priv(address, size, access_type);
         } else if /* CCR.UNALIGN_TRP */ false {
             // USFR.UNALIGNED = true;
-            panic!("UsageFault");
+            return Err("UsageFault".to_string());
         } else {
             let mut result: u32 = 0;
             for i in 0..(size as u32) {
@@ -308,9 +312,12 @@ pub struct Board {
     audio_handler: AudioHandler,
     instruction_cache: InstructionCache,
     pub cpu: CPU,
-    memory: MemoryBus,
+    pub memory: MemoryBus,
     register_formats: [RegFormat; 16],
     branch_map: HashMap<u32, String>,
+
+    // HACK: To trigger default handler
+    pending_default_handler: std::cell::Cell<bool>,
 }
 
 /**
@@ -328,23 +335,82 @@ impl Board {
             memory: MemoryBus::new(),
             register_formats: [RegFormat::Hex; 16],
             branch_map: HashMap::new(),
+            pending_default_handler: std::cell::Cell::new(false),
         };
     }
 
     pub fn step(&mut self) -> Result<(), String> {
         match self.fetch() {
             Ok((i, w)) => {
-                return self.execute(i, w);
+                if let Err(e) = self.execute(i, w) {
+                    println!("failed to execute instruction: {}", e);
+                }
             }
             Err(e) => {
-                // TODO: Goto default handler
-                return Err(e);
+                println!("failed to fetch instruction: {}", e);
             }
         };
+
+        if self.pending_default_handler.get() {
+            match self.try_goto_default_handler() {
+                Ok(_) => {},
+                Err(e) => {
+                    println!("FATAL ERROR: {}", e);
+                    return Err(e);
+                }
+            }
+        }
+
+        return Ok(());
     }
 
     pub fn spawn_audio(&mut self) {
         self.audio_handler.spawn_audio();
+    }
+
+    fn get_default_handler(&self) -> Result<u32, String> {
+        // TODO: Goto fault handler (but account for when it doesn't goto valid location)
+        if let Ok(hard_fault_addr) = self.memory.read_mem_u(3 * 4, 4) {
+            if 0x0800_0000 <= hard_fault_addr && hard_fault_addr <= 0x0800_0000 + (self.memory.flash.len() as u32) {
+                return Ok(hard_fault_addr);
+            }
+        }
+        return Err(format!("Could not find fault handler"));
+    }
+
+    fn try_goto_default_handler(&mut self) -> Result<(), String> {
+        return match self.get_default_handler() {
+            Ok(h) => {
+                self.pending_default_handler.set(false);
+                self.branch_write_pc(h);
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    fn read_mem_u(&self, address: u32, size: usize) -> u32 {
+        return match self.memory.read_mem_u(address, size) {
+            Ok(v) => v,
+            Err(e) => {
+                self.pending_default_handler.set(true);
+                0
+            }
+        }
+    }
+
+    fn read_mem_a(&self, address: u32, size: usize) -> u32 {
+        return match self.memory.read_mem_a(address, size) {
+            Ok(v) => v,
+            Err(e) => {
+                self.pending_default_handler.set(true);
+                0
+            }
+        }
+    }
+
+    fn read_word(&self, address: u32) -> u32 {
+        return self.read_mem_u(address, 4);
     }
 
     /**
@@ -1287,7 +1353,7 @@ impl Board {
         let mut address = self.read_reg(rn);
         for i in 0..=7u32 {
             if bitset(registers, i) {
-                self.write_reg(i, self.memory.read_word(address).unwrap_or_default());
+                self.write_reg(i, self.read_word(address));
                 address += 4;
             }
         }
@@ -1305,12 +1371,12 @@ impl Board {
         let mut address = self.read_reg(rn);
         for i in 0..=14u32 { // TODO: Skip stack pointer
             if bitset(registers, i) {
-                self.write_reg(i, self.memory.read_word(address).unwrap_or_default());
+                self.write_reg(i, self.read_word(address));
                 address += 4;
             }
         }
         if bitset(registers, 15) {
-            self.load_write_pc(self.memory.read_word(address).unwrap_or_default());
+            self.load_write_pc(self.read_word(address));
         }
         if wback && !bitset(registers, rn) {
             self.write_reg(rn, address);
@@ -1326,12 +1392,12 @@ impl Board {
         let mut address = self.read_reg(rn) - 4 * registers.count_ones();
         for i in 0..=14u32 {
             if bitset(registers, i) {
-                self.write_reg(i, self.memory.read_mem_a(address, 4).unwrap_or_default());
+                self.write_reg(i, self.read_mem_a(address, 4));
                 address += 4;
             }
         }
         if bitset(registers, 15) {
-            self.load_write_pc(self.memory.read_mem_a(address, 4).unwrap_or_default());
+            self.load_write_pc(self.read_mem_a(address, 4));
         }
         if wback && !bitset(registers, rn) {
             self.write_reg(rn, self.read_reg(rn) - 4 * registers.count_ones());
@@ -1343,7 +1409,7 @@ impl Board {
         let rn = data >> 12;
         let imm32 = (data & 0xFF) << 2;
         let address = self.read_reg(rn).wrapping_add(imm32);
-        self.write_reg(rt, self.memory.read_word(address).unwrap_or_default());
+        self.write_reg(rt, self.read_word(address));
     }
 
     fn w_ldr_imm(&mut self, data: u32, extra: u32) {
@@ -1355,7 +1421,7 @@ impl Board {
 
         let offset_address = self.read_reg(rn).wrapping_add(sign_extend(extra, 12));
         let address = if index { offset_address } else { self.read_reg(rn) };
-        let data = self.memory.read_word(address).unwrap_or_default();
+        let data = self.read_word(address);
         if wback { self.write_reg(rn, offset_address); }
         if rt == 15 {
             if (address & 0b11) == 0 {
@@ -1372,7 +1438,7 @@ impl Board {
         let rt = data >> 10;
         let imm10 = data & 0x3FF;
         let address = word_align(self.read_pc()).wrapping_add(imm10);
-        let value = self.memory.read_word(address).unwrap_or_default();
+        let value = self.read_word(address);
         if rt == 15 {
             if (address & 0b11) == 0 {
                 self.load_write_pc(value);
@@ -1388,7 +1454,7 @@ impl Board {
         // A7.7.44
         let rt = data;
         let address = word_align(self.read_pc()).wrapping_add(sign_extend(extra, 12));
-        let data = self.memory.read_word(address).unwrap_or_default(); // TODO: Proper error handling
+        let data = self.read_word(address);
         if rt == 15 {
             if (address & 0b11) == 0 {
                 self.load_write_pc(data);
@@ -1406,7 +1472,7 @@ impl Board {
         let rn = (data >> 3) & 0b111;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        let value = self.memory.read_word(address).unwrap_or_default();
+        let value = self.read_word(address);
         self.write_reg(rt, value);
     }
 
@@ -1421,7 +1487,7 @@ impl Board {
 
         // NOTE: Manual does not define `add`, `index`, or `wback` so we just assume it matches T1
         let address = self.read_reg(rn).wrapping_add(offset);
-        let value = self.memory.read_mem_u(address, 4).expect(format!("could not read memory at {}", address).as_str());
+        let value = self.read_mem_u(address, 4);
         if rt == 15 {
             if address & 0b11 != 0 {
                 println!("UNPREDICTABLE: ldr.W");
@@ -1438,7 +1504,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let imm5 = data >> 6;
         let address = self.read_reg(rn).wrapping_add(imm5);
-        let loaded = self.memory.read_mem_u(address, 1).unwrap_or_default();
+        let loaded = self.read_mem_u(address, 1);
         self.write_reg(rt, loaded);
     }
 
@@ -1448,7 +1514,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        let loaded = self.memory.read_mem_u(address, 1).unwrap_or_default();
+        let loaded = self.read_mem_u(address, 1);
         self.write_reg(rt, loaded);
     }
 
@@ -1460,7 +1526,7 @@ impl Board {
 
         let address = self.read_reg(rn).wrapping_add(imm10);
         self.set_exclusive_monitors(address, 4);
-        self.write_reg(rt, self.memory.read_mem_a(address, 4).unwrap_or_default());
+        self.write_reg(rt, self.read_mem_a(address, 4));
     }
 
     fn n_ldrh_imm(&mut self, data: u32) {
@@ -1469,7 +1535,7 @@ impl Board {
         let rt = (data >> 6) & 0x7;
         let rn = data >> 9;
         let address = self.read_reg(rn).wrapping_add(imm6);
-        let loaded = self.memory.read_mem_u(address, 2).unwrap_or_default();
+        let loaded = self.read_mem_u(address, 2);
         self.write_reg(rt, loaded);
     }
 
@@ -1479,7 +1545,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        let loaded = self.memory.read_mem_u(address, 2).unwrap_or_default();
+        let loaded = self.read_mem_u(address, 2);
         self.write_reg(rt, loaded);
     }
 
@@ -1489,7 +1555,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        let loaded = self.memory.read_mem_u(address, 1).unwrap_or_default();
+        let loaded = self.read_mem_u(address, 1);
         self.write_reg(rt, sign_extend(loaded, 7));
     }
 
@@ -1499,7 +1565,7 @@ impl Board {
         let rn = (data >> 3) & 0x7;
         let rm = data >> 6;
         let address = self.read_reg(rn).wrapping_add(self.read_reg(rm));
-        let loaded = self.memory.read_mem_u(address, 2).unwrap_or_default();
+        let loaded = self.read_mem_u(address, 2);
         self.write_reg(rt, sign_extend(loaded, 15));
     }
 
@@ -1868,12 +1934,12 @@ impl Board {
         // TODO: Test order of all push / pop iterations
         for i in 0..=7u32 {
             if bitset(data, i) {
-                self.write_reg(i, self.memory.read_mem_a(address, 4).unwrap_or_default());
+                self.write_reg(i, self.read_mem_a(address, 4));
                 address += 4;
             }
         }
         if bitset(data, 8) {
-            self.load_write_pc(self.memory.read_mem_a(address, 4).unwrap_or_default());
+            self.load_write_pc(self.read_mem_a(address, 4));
             address += 4;
         }
         self.write_sp(address);
@@ -1886,7 +1952,7 @@ impl Board {
 
         if single_mode {
             let rt = extra;
-            let result = self.memory.read_mem_u(address, 4).unwrap_or_default();
+            let result = self.read_mem_u(address, 4);
             if rt == 15 {
                 self.load_write_pc(result);
             } else {
@@ -1897,12 +1963,12 @@ impl Board {
             let registers = extra & 0xFFFF;
             for i in 0..=14u32 {
                 if bitset(registers, i) {
-                    self.write_reg(i, self.memory.read_mem_a(address, 4).unwrap_or_default());
+                    self.write_reg(i, self.read_mem_a(address, 4));
                     address += 4;
                 }
             }
             if bitset(registers, 15) {
-                self.load_write_pc(self.memory.read_mem_u(address, 4).unwrap_or_default());
+                self.load_write_pc(self.read_mem_u(address, 4));
                 address += 4;
             }
         }
@@ -2428,9 +2494,9 @@ impl Board {
         let rn_val = self.read_reg(rn);
         let rm_val = self.read_reg(rm);
         let halfwords = if is_tbh {
-            self.memory.read_mem_u(rn_val + rm_val << 1, 2).unwrap_or_default()
+            self.read_mem_u(rn_val + rm_val << 1, 2)
         } else {
-            self.memory.read_mem_u(rn_val + rm_val, 1).unwrap_or_default()
+            self.read_mem_u(rn_val + rm_val, 1)
         };
         self.branch_write_pc(self.read_pc().wrapping_add(halfwords * 2));
     }

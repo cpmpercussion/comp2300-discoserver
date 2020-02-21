@@ -22,5 +22,4 @@ main:
   movs r8, 0xFF << 24 @ set carry flag
   mov r9, 1
   adc.W r10, r9, r8, ASR 32
-
 .size main, . - main

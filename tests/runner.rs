@@ -194,3 +194,36 @@ fn mov() {
     board.step().unwrap();
     assert_eq!(board.cpu.read_instruction_pc(), 122); // Branching 0's the least significant bit
 }
+
+#[test]
+fn ldr_str() {
+    let mut board = load_program("ldrstr").unwrap();
+
+    // STR (imm) T4
+    let mut i = 0;
+    while board.read_reg(5u32) != 1 {
+        i += 1;
+        if i > 100_000 {
+            panic!("Expected iterations to finish");
+        };
+        board.step().unwrap();
+    }
+
+    let test_val = 0x32A7F092;
+    for i in (0x2000_0000..0x2001_8000).step_by(4) {
+        match board.memory.read_mem_u(i, 4) {
+            Ok(v) => {
+                if v != test_val {
+                    println!("incorrect memory value: expected {}, got {}", test_val, v);
+                    assert!(false);
+                }
+            },
+            Err(e) => {
+                println!("Failed to read word at {}: {}", i, e);
+                assert!(false);
+            }
+        };
+    }
+
+    
+}

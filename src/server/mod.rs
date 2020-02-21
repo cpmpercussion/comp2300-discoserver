@@ -160,7 +160,7 @@ impl GdbServer {
                 }
             };
 
-            println!("received request: {:?}", request);
+            // println!("received request: {:?}", request);
 
             match request {
                 Request::Acknowledge => {/* do nothing*/},
@@ -355,7 +355,7 @@ impl GdbServer {
         out.extend_from_slice(contents);
         out.push(b'#');
         out.extend_from_slice(get_checksum_hex(&contents).as_bytes());
-        println!("sending reply: {:?}", std::str::from_utf8(out.as_ref()));
+        // println!("sending reply: {:?}", std::str::from_utf8(out.as_ref()));
         self.stream.write(out.as_ref()).expect("failed to send message");
     }
 
@@ -656,11 +656,11 @@ impl GdbServer {
             }
         };
 
-        if size <= 40 {
-            println!("TCP: {:?}", std::str::from_utf8(self.tcp_buffer[..size].as_ref()));
-        } else {
-            println!("TCP (trunc): {:?}", std::str::from_utf8(self.tcp_buffer[..10].as_ref()));
-        }
+        // if size <= 40 {
+        //     println!("TCP: {:?}", std::str::from_utf8(self.tcp_buffer[..size].as_ref()));
+        // } else {
+        //     println!("TCP (trunc): {:?}", std::str::from_utf8(self.tcp_buffer[..10].as_ref()));
+        // }
 
         if size == 0 {
             return Ok(());
