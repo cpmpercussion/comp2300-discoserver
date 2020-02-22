@@ -1,11 +1,12 @@
 mod lcd;
+use crate::MemError;
 use lcd::LCD;
 mod rcc;
 use rcc::RCC;
 
 pub trait Peripheral {
-    fn read(&self, offset: u32, size: usize) -> Result<u32, String>;
-    fn write(&mut self, offset: u32, size: usize) -> Result<(), String>;
+    fn read(&self, offset: u32, size: usize) -> Result<u32, MemError>;
+    fn write(&mut self, offset: u32, size: usize) -> Result<(), MemError>;
     fn reset(&mut self);
 }
 
@@ -13,12 +14,14 @@ pub trait Peripheral {
 struct UnimplementedPeripheral {}
 
 impl Peripheral for UnimplementedPeripheral {
-    fn read(&self, offset: u32, _size: usize) -> Result<u32, String> {
-        return Err(format!("Offset at {:#010X} is unimplemented", offset));
+    fn read(&self, offset: u32, _size: usize) -> Result<u32, MemError> {
+        println!("Perihperal read offset at {:#010X} is unimplemented", offset);
+        return Ok(0);
     }
 
-    fn write(&mut self, offset: u32, _size: usize) -> Result<(), String> {
-        return Err(format!("Offset at {:#010X} is unimplemented", offset));
+    fn write(&mut self, offset: u32, _size: usize) -> Result<(), MemError> {
+        println!("Peripheral write offset at {:#010X} is unimplemented", offset);
+        return Ok(());
     }
 
     fn reset(&mut self) {}
@@ -103,7 +106,7 @@ impl Peripherals {
         return Peripherals { ..Default::default() };
     }
 
-    pub fn read(&self, address: u32, size: usize) -> Result<u32, String> {
+    pub fn read(&self, address: u32, size: usize) -> Result<u32, MemError> {
         println!("Reading peripheral at {:#10X}", address);
         assert!(size == 1 || size == 2 || size == 4);
         if !(0x4000_0000..=0x5FFF_FFFF).contains(&address) {
@@ -119,7 +122,7 @@ impl Peripherals {
         }
     }
 
-    fn read_apb1(&self, address: u32, size: usize) -> Result<u32, String> {
+    fn read_apb1(&self, address: u32, size: usize) -> Result<u32, MemError> {
         if !(0x4000_0000..=0x4000_97FF).contains(&address) {
             panic!("Unexpected address {:#010X} for APB1 bus", address);
         }
@@ -156,7 +159,7 @@ impl Peripherals {
         }
     }
 
-    fn read_apb2(&self, address: u32, size: usize) -> Result<u32, String> {
+    fn read_apb2(&self, address: u32, size: usize) -> Result<u32, MemError> {
         return match address {
             0x4001_0000..=0x4001_002F => self.syscfg.read(address - 0x4001_0000, size),
             0x4001_0030..=0x4001_01FF => self.vrefbuf.read(address - 0x4001_0030, size),
@@ -178,7 +181,7 @@ impl Peripherals {
         }
     }
 
-    fn read_ahb1(&self, address: u32, size: usize) -> Result<u32, String> {
+    fn read_ahb1(&self, address: u32, size: usize) -> Result<u32, MemError> {
         return match address {
             0x4002_0000..=0x4002_03FF => self.dma1.read(address - 0x4002_0000, size),
             0x4002_0400..=0x4002_07FF => self.dma2.read(address - 0x4002_0400, size),
@@ -190,7 +193,7 @@ impl Peripherals {
         }
     }
 
-    fn read_ahb2(&self, address: u32, size: usize) -> Result<u32, String> {
+    fn read_ahb2(&self, address: u32, size: usize) -> Result<u32, MemError> {
         return match address {
             0x4800_0000..=0x4800_03FF => self.gpioa.read(address - 0x4800_0000, size),
             0x4800_0400..=0x4800_07FF => self.gpiob.read(address - 0x4800_0400, size),
@@ -207,7 +210,8 @@ impl Peripherals {
         }
     }
 
-    pub fn write(&mut self, _value: u32, _address: u32, _size: usize) -> Result<(), String> {
-        return Err(format!("Not implemented yet"));
+    pub fn write(&mut self, _value: u32, _address: u32, _size: usize) -> Result<(), MemError> {
+        println!("Unimplemented peripheral write");
+        return Ok(());
     }
 }

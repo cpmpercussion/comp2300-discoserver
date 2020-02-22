@@ -376,6 +376,7 @@ fn push() {
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 8, 4).unwrap(), 7);
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 12, 4).unwrap(), 3);
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 16, 4).unwrap(), 0);
+    assert_eq!(board.read_sp(), 0x2001_8000 - 16);
 
     // PUSH T2
     board.step().unwrap();
@@ -391,10 +392,47 @@ fn push() {
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 36, 4).unwrap(), 4);
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 40, 4).unwrap(), 3);
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 44, 4).unwrap(), 2);
+    assert_eq!(board.read_sp(), 0x2001_8000 - 44);
 
     // PUSH T3
     board.step().unwrap();
     assert_eq!(board.read_sp(), 0x2001_7FFC); // The stack pointer lower bits are cleared
     board.step().unwrap();
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 8, 4).unwrap(), 14);
+}
+
+#[test]
+fn pop() {
+    let mut board = load_program("pop").unwrap();
+    let mut i = 0;
+    while board.read_reg(5u32) != 1 {
+        i += 1;
+        if i > 100_000 {
+            panic!("Expected iterations to finish");
+        };
+        board.step().unwrap();
+    }
+
+    // POP T1
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.read_reg(7u32), 0xC);
+    assert_eq!(board.read_reg(4u32), 0xB);
+    assert_eq!(board.read_reg(1u32), 0xA);
+    assert_eq!(board.read_sp(), 0x2001_8000);
+
+    // POP T2
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.read_reg(10u32), 0x8);
+    assert_eq!(board.read_reg(11u32), 0x9);
+    assert_eq!(board.read_reg(12u32), 0xA);
+    assert_eq!(board.read_lr(), 0xB);
+    assert_eq!(board.read_sp(), 0x20017FFC);
+
+    // POP T3
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.read_reg(5u32), 0x9);
+    assert_eq!(board.read_sp(), 0x20017FF4);
 }

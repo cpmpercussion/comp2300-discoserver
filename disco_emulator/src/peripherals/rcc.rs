@@ -1,3 +1,4 @@
+use crate::MemError;
 use crate::peripherals::Peripheral;
 use crate::utils::io::read_register;
 
@@ -79,7 +80,7 @@ impl Default for RCC {
 }
 
 impl Peripheral for RCC {
-    fn read(&self, offset: u32, size: usize) -> Result<u32, String> {
+    fn read(&self, offset: u32, size: usize) -> Result<u32, MemError> {
         return match offset {
             0x00..=0x03 => read_register(self.cr, offset, size),
             0x04..=0x07 => read_register(self.icscr, offset - 0x04, size),
@@ -93,15 +94,16 @@ impl Peripheral for RCC {
             0x24..=0x27 => read_register(self.ahb2rstr, offset - 0x24, size),
             0x28..=0x2B => read_register(self.ahb3rstr, offset - 0x28, size),
             0x58..=0x5B => read_register(self.apb1enr1, offset - 0x58, size),
-            _ => Err(format!("unimplemented RCC register")),
+            _ => Err(MemError::Unimplemented),
         }
 
         // println!("Returning {:#010X}", self.icscr);
         // return Ok(self.icscr);
     }
 
-    fn write(&mut self, address: u32, _size: usize) -> Result<(), String> {
-        return Err(format!("RCC write at {:#010X} is unimplemented", address));
+    fn write(&mut self, address: u32, _size: usize) -> Result<(), MemError> {
+        println!("RCC write at {:#010X} is unimplemented", address);
+        return Ok(());
     }
 
     fn reset(&mut self) {

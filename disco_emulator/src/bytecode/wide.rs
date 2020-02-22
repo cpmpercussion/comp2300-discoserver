@@ -9,6 +9,7 @@ type Context = InstructionContext;
 pub fn decode_thumb_wide(word: u32, c: InstructionContext) -> ByteInstruction {
     // A5.3
     assert!(matches(word, 29, 0b111, 0b111));
+
     let op2 = (word >> 20) & 0b111_1111;
     return match (word >> 27) & 0b11 {
         0b01 => {

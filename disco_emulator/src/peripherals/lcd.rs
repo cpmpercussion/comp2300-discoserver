@@ -1,3 +1,4 @@
+use crate::MemError;
 use crate::peripherals::Peripheral;
 use crate::utils::io::read_register;
 
@@ -29,19 +30,20 @@ impl Default for LCD {
 }
 
 impl Peripheral for LCD {
-    fn read(&self, offset: u32, size: usize) -> Result<u32, String> {
+    fn read(&self, offset: u32, size: usize) -> Result<u32, MemError> {
         return match offset {
             0x00..=0x03 => read_register(self.cr, offset, size),
             0x04..=0x07 => read_register(self.fcr, offset - 0x04, size),
             0x08..=0x0B => read_register(self.cr, offset - 0x08, size),
             0x0C..=0x0F => read_register(self.clr, offset - 0x0C, size),
             0x14..=0x53 => read_register(self.ram[((offset - 0x14) / 32) as usize], offset, size),
-            _ => Err(format!("unimplemented LCD register")),
+            _ => Err(MemError::Unimplemented),
         }
     }
 
-    fn write(&mut self, address: u32, _size: usize) -> Result<(), String> {
-        return Err(format!("LCD write at {:#010X} is unimplemented", address));
+    fn write(&mut self, address: u32, _size: usize) -> Result<(), MemError> {
+        println!("LCD write at {:#010X} is unimplemented", address);
+        return Ok(());
     }
 
     fn reset(&mut self) {

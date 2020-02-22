@@ -139,11 +139,11 @@ impl fmt::Debug for MemoryBus {
     }
 }
 
-fn read_value(bank: &[u8], base: usize, size: usize) -> Result<u32, String> {
+fn read_value(bank: &[u8], base: usize, size: usize) -> Result<u32, MemError> {
     assert!(size == 1 || size == 2 || size == 4);
     if base + size > bank.len() {
         println!("{} + {} > {}", base, size, bank.len());
-        return Err("out of bounds".to_string());
+        return Err(MemError::OutOfBounds);
     }
 
     let mut result: u32 = 0;
@@ -154,10 +154,10 @@ fn read_value(bank: &[u8], base: usize, size: usize) -> Result<u32, String> {
     return Ok(result);
 }
 
-fn write_value(mut value: u32, bank: &mut[u8], base: usize, size: usize) -> Result<(), String> {
+fn write_value(mut value: u32, bank: &mut[u8], base: usize, size: usize) -> Result<(), MemError> {
     assert!(size == 1 || size == 2 || size == 4);
     if base + size > bank.len() {
-        return Err("out of bounds".to_string());
+        return Err(MemError::OutOfBounds);
     }
 
     for i in 0..size {
@@ -165,6 +165,20 @@ fn write_value(mut value: u32, bank: &mut[u8], base: usize, size: usize) -> Resu
         value = value >> 8;
     }
     return Ok(());
+}
+
+#[derive(Debug)]
+pub enum MemError {
+    OutOfBounds,
+    ReadOnly,
+    Unaligned,
+    Unimplemented,
+}
+
+impl fmt::Display for MemError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl MemoryBus {
@@ -216,18 +230,18 @@ impl MemoryBus {
         return Err(format!("Out of bounds access for instruction address 0x{:08X}", address));
     }
 
-    fn read_mem_a(&self, address: u32, size: usize) -> Result<u32, String> {
+    fn read_mem_a(&self, address: u32, size: usize) -> Result<u32, MemError> {
         // B2.3.4 p583
         return self.read_mem_a_with_priv(address, size, &AccessType::Normal);
     }
 
-    fn read_mem_a_with_priv(&self, address: u32, size: usize, _access_type: &AccessType) -> Result<u32, String> {
+    fn read_mem_a_with_priv(&self, address: u32, size: usize, _access_type: &AccessType) -> Result<u32, MemError> {
         // B2.3.4 p583
         if address != align(address, size as u32) {
             // Set UFSR.UNALIGNED = true;
             println!("UsageFault: unaligned memory access");
             let hard_fault_handler = read_value(&*self.flash, 4 * 3, 4);
-            return Err("unaligned memory access".to_string());
+            return Err(MemError::Unaligned);
         }
 
         // let memaddrdesc = validate_address(address, access_type, false); // TODO
@@ -239,18 +253,18 @@ impl MemoryBus {
         };
     }
 
-    pub fn read_mem_u(&self, address: u32, size: usize) -> Result<u32, String> {
+    pub fn read_mem_u(&self, address: u32, size: usize) -> Result<u32, MemError> {
         // B2.3.5 p584
         return self.read_mem_u_with_priv(address, size, &AccessType::Normal);
     }
 
-    fn read_mem_u_with_priv(&self, address: u32, size: usize, access_type: &AccessType) -> Result<u32, String> {
+    fn read_mem_u_with_priv(&self, address: u32, size: usize, access_type: &AccessType) -> Result<u32, MemError> {
         // B2.3.5 p585
         if address == align(address, size as u32) {
             return self.read_mem_a_with_priv(address, size, access_type);
         } else if /* CCR.UNALIGN_TRP */ false {
             // USFR.UNALIGNED = true;
-            return Err("UsageFault".to_string());
+            return Err(MemError::Unaligned);
         } else {
             let mut result: u32 = 0;
             for i in 0..(size as u32) {
@@ -260,7 +274,7 @@ impl MemoryBus {
         }
     }
 
-    fn address_to_physical(&self, address: u32) -> Result<Location, String> {
+    fn address_to_physical(&self, address: u32) -> Result<Location, MemError> {
         let address = address as usize;
         let location = match address {
             0x0000_0000..=0x000F_FFFF => Location::Flash(address),
@@ -268,32 +282,32 @@ impl MemoryBus {
             0x2000_0000..=0x2001_FFFF => Location::Ram(address - 0x2000_0000),
             0x4000_0000..=0x5FFF_FFFF => Location::Peripheral(address as u32),
             _ => {
-                return Err(format!("Out of bounds memory access at {:#010X}", address));
+                return Err(MemError::OutOfBounds);
             }
         };
         return Ok(location);
     }
 
-    fn read_word(&self, address: u32) -> Result<u32, String> {
+    fn read_word(&self, address: u32) -> Result<u32, MemError> {
         return self.read_mem_u(address, 4);
     }
 
-    fn read_halfword(&self, address: u32) -> Result<u16, String> {
+    fn read_halfword(&self, address: u32) -> Result<u16, MemError> {
         return Ok(self.read_mem_u(address, 2)? as u16);
     }
 
-    fn read_byte(&self, address: u32) -> Result<u8, String> {
+    fn read_byte(&self, address: u32) -> Result<u8, MemError> {
         return Ok(self.read_mem_u(address, 1)? as u8);
     }
 
-    fn read_byte_unpriv(&self, address: u32) -> Result<u8, String> {
+    fn read_byte_unpriv(&self, address: u32) -> Result<u8, MemError> {
         return self.read_byte(address);
     }
 
-    fn write_mem_u(&mut self, address: u32, size: usize, value: u32) -> Result<(), String> {
+    fn write_mem_u(&mut self, address: u32, size: usize, value: u32) -> Result<(), MemError> {
         let location = self.address_to_physical(address)?;
         return match location {
-            Location::Flash(_) => Err(String::from("Cannot write to Flash memory")),
+            Location::Flash(_) => Err(MemError::ReadOnly),
             Location::Ram(i) => {
                 write_value(value, &mut *self.data, i, size)
             }
@@ -301,12 +315,12 @@ impl MemoryBus {
         }
     }
 
-    fn write_mem_a(&mut self, address: u32, size: usize, value: u32) -> Result<(), String> {
+    fn write_mem_a(&mut self, address: u32, size: usize, value: u32) -> Result<(), MemError> {
         // TODO
         return self.write_mem_u(address, size, value);
     }
 
-    fn write_word(&mut self, address: u32, value: u32) -> Result<(), String> {
+    fn write_word(&mut self, address: u32, value: u32) -> Result<(), MemError> {
         return self.write_mem_u(address, 4, value);
     }
 }
@@ -423,8 +437,19 @@ impl Board {
     }
 
     fn write_mem_u(&mut self, address: u32, size: usize, value: u32) {
+        // NOTE: The board has a 1-2 step delay before going to going to handler,
+        //       we just go immediately.
         if let Err(e) = self.memory.write_mem_u(address, size, value) {
-            self.pending_default_handler.set(true);
+            match e {
+                MemError::OutOfBounds => self.pending_default_handler.set(true),
+                MemError::ReadOnly => {
+                    println!("attempted to write to readonly memory: 0x{:08X}", address);
+                },
+                MemError::Unaligned => {},
+                MemError::Unimplemented => {
+                    println!("EMULATOR ERROR: unimplemented memory write");
+                }
+            }
         }
     }
 
