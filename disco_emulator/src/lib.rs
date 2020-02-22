@@ -1971,7 +1971,6 @@ impl Board {
     fn n_pop(&mut self, data: u32) {
         // A7.7.99
         let mut address = self.read_sp();
-        // TODO: Test order of all push / pop iterations
         for i in 0..=7u32 {
             if bitset(data, i) {
                 self.write_reg(i, self.read_mem_a(address, 4));
