@@ -893,7 +893,8 @@ impl Board {
     fn bx_write_pc(&mut self, address: u32) {
         // A2.3.1 p31
         if self.cpu.current_mode == ExecMode::ModeHandler && (address >> 28) == 0xF {
-            panic!("TODO: ExceptionReturn(address & !(0xF << 28))");
+            println!("TODO: ExceptionReturn(address & !(0xF << 28))");
+            self.pending_default_handler.set(true);
         } else {
             self.blx_write_pc(address);
         }
@@ -903,7 +904,8 @@ impl Board {
         // A2.3.1 p31
         self.cpu.set_thumb_mode(bitset(address, 0));
         if !self.cpu.read_thumb_mode() {
-            panic!("self.raise_exception(Exception::UsageFault('Invalid State'))"); // TODO: Centralise exceptions
+            println!("self.raise_exception(Exception::UsageFault('Invalid State'))");
+            self.pending_default_handler.set(true);
         }
         self.branch_to(address & !0b1);
     }
@@ -1256,8 +1258,8 @@ impl Board {
     fn n_blx_reg(&mut self, data: u32) {
         // A7.7.19
         let target = self.read_reg(data);
-        let next_instr_address = self.read_pc() + 2;
-        self.write_lr(next_instr_address & 0b1);
+        let next_instr_address = self.read_pc() - 2;
+        self.write_lr(next_instr_address | 0b1);
         self.blx_write_pc(target);
     }
 
@@ -1476,7 +1478,8 @@ impl Board {
             if (address & 0b11) == 0 {
                 self.load_write_pc(data);
             } else {
-                panic!("Unpredictable");
+                println!("Unpredictable");
+                self.pending_default_handler.set(true);
             }
         } else {
             self.write_reg(rt, data);
@@ -1492,7 +1495,8 @@ impl Board {
             if (address & 0b11) == 0 {
                 self.load_write_pc(value);
             } else {
-                panic!("Unpredictable");
+                println!("Unpredictable");
+                self.pending_default_handler.set(true);
             }
         } else {
             self.write_reg(rt, value);
@@ -1508,7 +1512,8 @@ impl Board {
             if (address & 0b11) == 0 {
                 self.load_write_pc(data);
             } else {
-                panic!("Unpredictable");
+                println!("Unpredictable");
+                self.pending_default_handler.set(true);
             }
         } else {
             self.write_reg(rt, data);
@@ -1540,6 +1545,7 @@ impl Board {
         if rt == 15 {
             if address & 0b11 != 0 {
                 println!("UNPREDICTABLE: ldr.W");
+                self.pending_default_handler.set(true);
             }
             self.load_write_pc(value);
         } else {
@@ -2602,7 +2608,8 @@ impl Board {
     fn n_udf(&mut self, data: u32) {
         // A7.7.194
         // TODO: throw UndefinedException
-        panic!("Undefined exception");
+        println!("Undefined exception");
+        self.pending_default_handler.set(true);
     }
 
     fn w_udiv(&mut self, data: u32, extra: u32) {
@@ -2612,7 +2619,9 @@ impl Board {
         let m = self.read_reg(rm);
         let result = if m == 0 {
             if /*IntegerZeroDivideTrappingEnabled*/ true {
-                panic!("GenerateIntegerZeroDivide");
+                println!("GenerateIntegerZeroDivide");
+                self.pending_default_handler.set(true);
+                return;
             } else {
                 0
             }

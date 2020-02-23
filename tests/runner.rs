@@ -456,4 +456,56 @@ fn branch() {
 
     board.step().unwrap();
     assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 20);
+    assert_eq!(board.read_reg(0u32), 0);
+}
+
+#[test]
+fn blx() {
+    let mut board = load_program("blx").unwrap();
+    let origin_pc = board.cpu.read_instruction_pc();
+
+    board.step().unwrap();
+    assert_ne!(board.read_reg(0u32), 0);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 16);
+    assert_eq!(board.read_lr(), origin_pc + 5);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 20);
+    assert_eq!(board.read_reg(0u32), 0);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 22);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc - 6);
+    assert_eq!(board.read_lr(), origin_pc + 25);
+
+    board.step().unwrap();
+    assert_eq!(board.read_reg(0u32), 1);
+}
+
+#[test]
+fn bl() {
+    let mut board = load_program("bl").unwrap();
+    let origin_pc = board.cpu.read_instruction_pc();
+
+    board.step().unwrap();
+    assert_ne!(board.read_reg(0u32), 0);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 20);
+    assert_eq!(board.read_lr(), origin_pc + 9);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 24);
+    assert_eq!(board.read_reg(0u32), 0);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc - 6);
+    assert_eq!(board.read_lr(), origin_pc + 29);
+
+    board.step().unwrap();
+    assert_eq!(board.read_reg(0u32), 1);
 }
