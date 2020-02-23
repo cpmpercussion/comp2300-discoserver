@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
 mod common;
-use common::{load_program, load_and_step};
+
+use common::{load_program, load_and_step, load_and_wait};
 
 #[test]
 fn adc() {
@@ -12,20 +13,21 @@ fn adc() {
     // ADC (imm) T1
     board.step().unwrap();
     assert_eq!(board.cpu.get_flags().c, false);
+
     board.step().unwrap();
     assert_eq!(board.read_reg(10u32), 0xA9 << 24);
 
     board.step().unwrap();
     assert_eq!(board.cpu.get_flags().c, true);
+
     board.step().unwrap();
     assert_eq!(board.read_reg(10u32), (0xA9 << 24) + 1);
 
     // ADC (reg) T1
     board.step().unwrap();
     assert_eq!(board.cpu.get_flags().c, true);
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+
+    board.step_n(3).unwrap();
     assert_eq!(board.read_reg(1u32), (0xFF << 24) + 1);
     let flags = board.cpu.get_flags();
     assert_eq!(flags.n, true);
@@ -36,8 +38,8 @@ fn adc() {
     // ADC (reg) T2
     board.step().unwrap();
     assert_eq!(board.cpu.get_flags().c, true);
-    board.step().unwrap();
-    board.step().unwrap();
+
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(10u32), 1);
 }
 
@@ -56,8 +58,7 @@ fn add() {
     assert_eq!(flags.v, false);
 
     // ADD (imm) T2
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(7u32), 0xFE);
     let flags = board.cpu.get_flags();
     assert_eq!(flags.n, false);
@@ -66,8 +67,7 @@ fn add() {
     assert_eq!(flags.v, false);
 
     // ADD (imm) T3
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(11u32), 0xFF << 24);
     let flags = board.cpu.get_flags();
     assert_eq!(flags.n, false);
@@ -88,24 +88,18 @@ fn add() {
     assert_eq!(board.read_reg(11u32), 0xFFF);
 
     // ADD (reg) T1
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     assert_eq!(board.read_reg(7u32), 0xED << 24);
 
     // ADD (reg) T2
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     assert_eq!(board.read_reg(11u32), 23);
     let flags = board.cpu.get_flags();
     assert_eq!(flags.n, false);
     assert_eq!(flags.z, true);
 
     // ADD (reg) T3
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     assert_eq!(board.read_reg(9u32), u32::max_value());
     let flags = board.cpu.get_flags();
     assert_eq!(flags.n, true);
@@ -121,13 +115,52 @@ fn add() {
 
     // ADD (reg) T2 w. PC
     assert_ne!(board.read_reg(4u32), 76);
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     assert_eq!(board.read_reg(4u32), 76);
 
     board.step().unwrap();
     assert_eq!(board.read_reg(4u32), 98);
+}
+
+#[test]
+fn sub() {
+    let mut board = load_program("sub").unwrap();
+
+    // SUB (imm) T1
+    board.step_n(2).unwrap();
+    assert_eq!(board.read_reg(6u32), 0xFFFF_FFFE);
+
+    // SUB (imm) T2
+    board.step_n(2).unwrap();
+    assert_eq!(board.read_reg(7u32), 0xFFFF_FEFF);
+
+    // SUB (imm) T3
+    board.step_n(2).unwrap();
+    assert_eq!(board.read_reg(10u32), 0xD);
+
+    // SUB (imm) T4
+    board.step_n(2).unwrap();
+    assert_eq!(board.read_reg(11u32), 0xFFFF_F07C);
+
+    // SUB (reg) T1
+    board.step_n(3).unwrap();
+    assert_eq!(board.read_reg(1u32), 0xFFFF_FFFB);
+
+    // SUB (reg) T2
+    board.step_n(3).unwrap();
+    assert_eq!(board.read_reg(12u32), 8);
+
+    // SUB (SP minus imm) T1
+    board.step_n(2).unwrap();
+    assert_eq!(board.read_sp(), 0x0000_FE00);
+
+    // SUB (SP minus imm) T2
+    board.step_n(2).unwrap();
+    assert_eq!(board.read_sp(), 0xFF01_FEFC);
+
+    // SUB (SP minus imm) T3
+    board.step_n(2).unwrap();
+    assert_eq!(board.read_sp(), 0x0000_EFFC);
 }
 
 #[test]
@@ -170,14 +203,12 @@ fn mov() {
     assert_eq!(board.read_reg(10u32), 65535);
 
     // MOV (reg) T1
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(8u32), 0xFF);
     assert_eq!(board.read_reg(9u32), 0xFF);
 
     // MOV (reg) T2
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(1u32), 0);
     let flags = board.cpu.get_flags();
     assert_eq!(flags.n, false);
@@ -197,17 +228,8 @@ fn mov() {
 
 #[test]
 fn str() {
-    let mut board = load_program("str").unwrap();
-
     // STR (imm) T4
-    let mut i = 0;
-    while board.read_reg(5u32) != 1 {
-        i += 1;
-        if i > 100_000 {
-            panic!("Expected iterations to finish");
-        };
-        board.step().unwrap();
-    }
+    let mut board = load_and_wait("str", 5, 1).unwrap();
     board.step().unwrap();
 
     let test_val = 0x32A7F092;
@@ -227,9 +249,7 @@ fn str() {
     }
 
     // STR (imm) T1
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     if let Ok(v) = board.memory.read_mem_u(0x2000_0000 + 124, 4) {
         assert_eq!(v, 0xDEADBEE1);
     } else {
@@ -237,9 +257,7 @@ fn str() {
     }
 
     // STR (imm) T2
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     if let Ok(v) = board.memory.read_mem_u(0x2000_0000 + 1020, 4) {
         assert_eq!(v, 0xDEADBEE2);
     } else {
@@ -247,9 +265,7 @@ fn str() {
     }
 
     // STR (imm) T3
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     if let Ok(v) = board.memory.read_mem_u(0x2000_0000 + 4095, 4) {
         assert_eq!(v, 0xDEADBEE3);
     } else {
@@ -257,9 +273,7 @@ fn str() {
     }
 
     // STR (imm) T4
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     if let Ok(v) = board.memory.read_mem_u(0x2000_0001, 4) {
         assert_eq!(v, 0xDEADBEE4);
     } else {
@@ -268,10 +282,7 @@ fn str() {
     assert_eq!(board.read_reg(10u32), 0x2000_0001);
 
     // STR (reg) T1
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(4).unwrap();
     if let Ok(v) = board.memory.read_mem_u(0x2000_0000 + 12, 4) {
         assert_eq!(v, 0xDEADBEE5);
     } else {
@@ -279,10 +290,7 @@ fn str() {
     }
 
     // STR (reg) T2
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(4).unwrap();
     if let Ok(v) = board.memory.read_mem_u(0x2000_0000 + (12 << 3), 4) {
         assert_eq!(v, 0xDEADBEE6);
     } else {
@@ -292,16 +300,7 @@ fn str() {
 
 #[test]
 fn ldr() {
-    let mut board = load_program("ldr").unwrap();
-
-    let mut i = 0;
-    while board.read_reg(5u32) != 1 {
-        i += 1;
-        if i > 100_000 {
-            panic!("Expected iterations to finish");
-        };
-        board.step().unwrap();
-    }
+    let mut board = load_and_wait("ldr", 5, 1).unwrap();
     board.step().unwrap();
 
     for i in (0x2000_0000..0x2001_8000).step_by(4) {
@@ -320,38 +319,29 @@ fn ldr() {
     }
 
     // LDR (imm) T1
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(1u32), 124);
 
     // LDR (imm) T2
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(1u32), 1020);
 
     // LDR (imm) T3
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     assert_eq!(board.read_reg(1u32), 4092);
     assert_eq!(board.read_reg(2u32), 0x0010_0000); // verified against real board w/ offset 4095
 
     // LDR (imm) T4
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(1u32), 0);
     assert_eq!(board.read_reg(0u32), 0x2000_0000);
 
     // LDR (reg) T1
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     assert_eq!(board.read_reg(2u32), 0x1777C);
 
     // LDR (reg) T2
-    board.step().unwrap();
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(3).unwrap();
     assert_eq!(board.read_reg(2u32), 16);
 
     // LDR (lit) T1
@@ -359,8 +349,7 @@ fn ldr() {
     assert_eq!(board.read_reg(0u32), 0xDEADBEE1);
 
     // LDR (lit) T2
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(0u32), 0xDEADBEE1);
     assert_eq!(board.read_reg(1u32), 0xDEADBEE2);
 }
@@ -370,8 +359,7 @@ fn push() {
     let mut board = load_and_step("push", 14).unwrap();
 
     // PUSH T1
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 4, 4).unwrap(), 14);
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 8, 4).unwrap(), 7);
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 12, 4).unwrap(), 3);
@@ -379,8 +367,7 @@ fn push() {
     assert_eq!(board.read_sp(), 0x2001_8000 - 16);
 
     // PUSH T2
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 4, 4).unwrap(), 14);
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 8, 4).unwrap(), 12);
     assert_eq!(board.memory.read_mem_u(0x2001_8000 - 12, 4).unwrap(), 11);
@@ -403,27 +390,17 @@ fn push() {
 
 #[test]
 fn pop() {
-    let mut board = load_program("pop").unwrap();
-    let mut i = 0;
-    while board.read_reg(5u32) != 1 {
-        i += 1;
-        if i > 100_000 {
-            panic!("Expected iterations to finish");
-        };
-        board.step().unwrap();
-    }
+    let mut board = load_and_wait("pop", 5, 1).unwrap();
 
     // POP T1
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(7u32), 0xC);
     assert_eq!(board.read_reg(4u32), 0xB);
     assert_eq!(board.read_reg(1u32), 0xA);
     assert_eq!(board.read_sp(), 0x2001_8000);
 
     // POP T2
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(10u32), 0x8);
     assert_eq!(board.read_reg(11u32), 0x9);
     assert_eq!(board.read_reg(12u32), 0xA);
@@ -431,8 +408,22 @@ fn pop() {
     assert_eq!(board.read_sp(), 0x20017FFC);
 
     // POP T3
-    board.step().unwrap();
-    board.step().unwrap();
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(5u32), 0x9);
     assert_eq!(board.read_sp(), 0x20017FF4);
+}
+
+#[test]
+fn mul() {
+    let mut board = load_program("mul").unwrap();
+
+    // MUL T1
+    board.step_n(3).unwrap();
+    assert_eq!(board.read_reg(7u32), 1);
+    assert_eq!(board.cpu.get_flags().n, false);
+    assert_eq!(board.cpu.get_flags().z, false);
+
+    // MUL T2
+    board.step_n(3).unwrap();
+    assert_eq!(board.read_reg(10u32), 1);
 }

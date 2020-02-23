@@ -96,3 +96,25 @@ pub fn load_and_step(name: &str, steps: usize) -> Result<Board, String> {
 
     return Ok(board);
 }
+
+pub fn load_and_wait(name: &str, wait_reg: u32, wait_signal: u32) -> Result<Board, String> {
+    let mut board = load_program(name)?;
+
+    let mut i = 0;
+    while board.read_reg(wait_reg) != wait_signal {
+        match board.step() {
+            Ok(_) => {},
+            Err(e) => {
+                println!("Failed to step board");
+                assert!(false);
+                return Err(e);
+            }
+        }
+        i += 1;
+        if i > 100_000 {
+            return Err("Board setup exceeded default iterations".to_string());
+        }
+    }
+
+    return Ok(board);
+}

@@ -363,10 +363,12 @@ impl Board {
             Ok((i, w)) => {
                 if let Err(e) = self.execute(i, w) {
                     println!("failed to execute instruction: {}", e);
+                    self.pending_default_handler.set(true);
                 }
             }
             Err(e) => {
                 println!("failed to fetch instruction: {}", e);
+                self.pending_default_handler.set(true);
             }
         };
 
@@ -380,6 +382,13 @@ impl Board {
             }
         }
 
+        return Ok(());
+    }
+
+    pub fn step_n(&mut self, steps: u32) -> Result<(), String> {
+        for _ in 0..steps {
+            self.step()?;
+        }
         return Ok(());
     }
 
