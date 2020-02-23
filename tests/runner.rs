@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 mod common;
-
 use common::{load_program, load_and_step, load_and_wait};
 
 #[test]
@@ -426,4 +425,35 @@ fn mul() {
     // MUL T2
     board.step_n(3).unwrap();
     assert_eq!(board.read_reg(10u32), 1);
+}
+
+#[test]
+fn branch() {
+    let mut board = load_program("branch").unwrap();
+    let origin_pc = board.cpu.read_instruction_pc();
+
+    board.step().unwrap();
+    assert_eq!(board.read_reg(0u32), 0);
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 2);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 4);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 22);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 10);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 12);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 16);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc - 10);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 20);
 }

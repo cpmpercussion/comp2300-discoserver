@@ -736,7 +736,7 @@ impl Board {
         }
 
         self.bx_write_pc(elf.entry as u32);
-        self.cpu.write_reg(15, elf.entry as u32);
+        self.cpu.write_reg(15, (elf.entry as u32) & !0b1);
 
         match self.memory.load_elf(elf, &bytes) {
             Ok(_) => {}
