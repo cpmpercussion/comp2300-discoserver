@@ -509,3 +509,25 @@ fn bl() {
     board.step().unwrap();
     assert_eq!(board.read_reg(0u32), 1);
 }
+
+#[test]
+fn bx() {
+    let mut board = load_program("bx").unwrap();
+    let origin_pc = board.cpu.read_instruction_pc();
+
+    board.step().unwrap();
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 16);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc + 20);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc - 16);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc - 14);
+
+    board.step().unwrap();
+    assert_eq!(board.cpu.read_instruction_pc(), origin_pc - 16);
+}
