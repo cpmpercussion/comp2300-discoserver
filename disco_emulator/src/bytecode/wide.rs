@@ -657,7 +657,7 @@ fn id_data_proc_plain_binary_immediate(word: u32, c: Context) -> ByteInstruction
     return match (word >> 20) & 0x1F {
         0b00000 => {
             let mut base = if rn == 15 {
-                tag::get_wide(Opcode::Adr, c, rd, imm12) // A7.7.7 T4
+                tag::get_wide(Opcode::Adr, c, rd, imm12) // A7.7.7 T3
             } else {
                 tag::get_wide(Opcode::AddImm, c, rd << 4 | rn << 8, imm12) // A7.7.3 T4
             };
@@ -675,7 +675,7 @@ fn id_data_proc_plain_binary_immediate(word: u32, c: Context) -> ByteInstruction
         }
         0b01010 => {
             let mut base = if rn == 15 {
-                tag::get_wide(Opcode::Adr, c, rd, get_negated_simm13(imm12)) // A7.7.7 T3
+                tag::get_wide(Opcode::Adr, c, rd, get_negated_simm13(imm12)) // A7.7.7 T2
             } else {
                 tag::get_wide(Opcode::SubImm, c, rd << 4 | rn << 8, imm12) // A7.7.174 T4
             };
