@@ -70,4 +70,4 @@ cargo build
 
 ### Tests
 
-Run the tests with `cargo test`. Typically each test compiles a corresponding program using `arm-none-eabi-as` and `arm-none-eabi-ld`, so make sure these are on your PATH (PlatformIO bundles these in `.platformio/packages/toolchain-gccarmnoneeabi/bin`). It then steps through, checking registers and flags for correct values.
+Run the tests with `cargo test --all`. Typically each integration test compiles a corresponding program using `arm-none-eabi-as` and `arm-none-eabi-ld`, so make sure these are on your PATH (PlatformIO bundles these in `.platformio/packages/toolchain-gccarmnoneeabi/bin`). It then steps through, checking registers and flags for correct values.

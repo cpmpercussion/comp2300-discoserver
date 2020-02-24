@@ -152,13 +152,44 @@ pub fn bit_field_clear(val: u32, msbit: u32, lsbit: u32) -> u32 {
     return val & get_mask(msbit, lsbit);
 }
 
+// Replaces original<msbit:lsbit> (inclusive) with provider<msbit-lsbit:0>
 pub fn bit_field_insert(original: u32, provider: u32, msbit: u32, lsbit: u32) -> u32 {
     let mask = get_mask(msbit, lsbit);
-    return (original & mask) | (provider | !mask);
+    let width = msbit - lsbit;
+    let insert = (provider & (0xFFFF_FFFF >> (31 - width))) << lsbit;
+    return (original & mask) | insert;
 }
 
 pub fn split_u64(large: u64) -> (u32, u32) {
     let upper = (large >> 32) as u32;
     let lower = (large & 0xFFFF_FFFF) as u32;
     return (upper, lower);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bit_field_clear() {
+        assert_eq!(bit_field_clear(0xFFFF_FFFF, 0, 0), 0xFFFF_FFFE);
+        assert_eq!(bit_field_clear(0xFFFF_FFFF, 31, 31), 0x7FFF_FFFF);
+        assert_eq!(bit_field_clear(0xFFFF_FFFF, 31, 0), 0x0000_0000);
+        assert_eq!(bit_field_clear(0xFFFF_FFFF, 10, 8), 0xFFFF_F8FF);
+    }
+
+    #[test]
+    fn test_bit_field_insert() {
+        assert_eq!(bit_field_insert(0x0000_0000, 0xFFFF_FFFF, 0, 0), 0x0000_0001);
+        assert_eq!(bit_field_insert(0x0000_0000, 0xFFFF_FFFF, 31, 31), 0x8000_0000);
+        assert_eq!(bit_field_insert(0x0000_0000, 0xFFFF_FFFF, 31, 0), 0xFFFF_FFFF);
+        assert_eq!(bit_field_insert(0x0000_0000, 0x0000_0007, 10, 8), 0x0000_0700);
+        assert_eq!(bit_field_insert(0xAAAA_AAAA, 0x0000_0005, 19, 16), 0xAAA5_AAAA);
+    }
+
+    #[test]
+    fn test_split_u64() {
+        assert_eq!(split_u64(0xFFFF_FFFF_FFFF_FFFF), (0xFFFF_FFFF, 0xFFFF_FFFF));
+        assert_eq!(split_u64(0xAAAA_AAAA_BBBB_BBBB), (0xAAAA_AAAA, 0xBBBB_BBBB));
+    }
 }
