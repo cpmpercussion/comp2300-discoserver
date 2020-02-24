@@ -156,3 +156,9 @@ pub fn bit_field_insert(original: u32, provider: u32, msbit: u32, lsbit: u32) ->
     let mask = get_mask(msbit, lsbit);
     return (original & mask) | (provider | !mask);
 }
+
+pub fn split_u64(large: u64) -> (u32, u32) {
+    let upper = (large >> 32) as u32;
+    let lower = (large & 0xFFFF_FFFF) as u32;
+    return (upper, lower);
+}

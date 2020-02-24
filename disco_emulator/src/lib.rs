@@ -608,7 +608,9 @@ impl Board {
             Opcode::TeqReg => self.w_teq_reg(data, extra),
             Opcode::TstImm => self.w_tst_imm(data, extra),
             Opcode::TstReg => self.w_tst_reg(data, extra),
+            Opcode::Udf    => self.w_udf(data, extra),
             Opcode::Udiv   => self.w_udiv(data, extra),
+            Opcode::Umaal  => self.w_umaal(data, extra),
             Opcode::Umlal  => self.w_umlal(data, extra),
             Opcode::Umull  => self.w_umull(data, extra),
             _ => {
@@ -2689,14 +2691,20 @@ impl Board {
         self.set_flags_nzc(result, carry);
     }
 
-    fn n_udf(&mut self, data: u32) {
+    fn n_udf(&mut self, _data: u32) {
         // A7.7.194
-        // TODO: throw UndefinedException
+        println!("Undefined exception");
+        self.pending_default_handler.set(true);
+    }
+
+    fn w_udf(&mut self, _data: u32, _extra: u32) {
+        // A7.7.194
         println!("Undefined exception");
         self.pending_default_handler.set(true);
     }
 
     fn w_udiv(&mut self, data: u32, extra: u32) {
+        // A7.7.195
         let rd = data & 0xF;
         let rn = data >> 4;
         let rm = extra;
@@ -2715,6 +2723,22 @@ impl Board {
         self.write_reg(rd, result);
     }
 
+    fn w_umaal(&mut self, data: u32, extra: u32) {
+        // A7.7.202
+        let rn = data & 0xF;
+        let rm = data >> 4;
+        let rd_lo = extra & 0xF;
+        let rd_hi = extra >> 4;
+
+        let rn_val = u64::from(self.read_reg(rn));
+        let rm_val = u64::from(self.read_reg(rm));
+
+        let result = rn_val * rm_val + u64::from(self.read_reg(rd_lo)) + u64::from(self.read_reg(rd_hi));
+        let (upper, lower) = bits::split_u64(result);
+        self.write_reg(rd_hi, upper);
+        self.write_reg(rd_lo, lower);
+    }
+
     fn w_umlal(&mut self, data: u32, extra: u32) {
         // A7.7.203
         let rn = data & 0xF;
@@ -2728,8 +2752,9 @@ impl Board {
         let rm_val = self.read_reg(rm) as u64;
         let addend = rd_hi_val << 32 + rd_lo_val;
         let result = (rn_val * rm_val).wrapping_add(addend);
-        self.write_reg(rd_lo, (result & 0xFFFF_FFFF) as u32);
-        self.write_reg(rd_hi, (result >> 32) as u32);
+        let (upper, lower) = bits::split_u64(result);
+        self.write_reg(rd_hi, upper);
+        self.write_reg(rd_lo, lower);
     }
 
     fn w_umull(&mut self, data: u32, extra: u32) {
@@ -2742,8 +2767,9 @@ impl Board {
         let rn_val = self.read_reg(rn) as u64;
         let rm_val = self.read_reg(rm) as u64;
         let result = rn_val * rm_val;
-        self.write_reg(rd_lo, (result & 0xFFFF_FFFF) as u32);
-        self.write_reg(rd_hi, (result >> 32) as u32);
+        let (upper, lower) = bits::split_u64(result);
+        self.write_reg(rd_hi, upper);
+        self.write_reg(rd_lo, lower);
     }
 
     fn n_uxtb(&mut self, data: u32) {

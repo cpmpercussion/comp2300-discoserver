@@ -162,3 +162,108 @@ Peripherals and interrupts are not supported. Audio specifically is supported, b
 | SSUB16 | ❌ |  |
 | SSUBB | ❌ |  |
 | STC, STC2 | ❌ |  |
+| STM, STMIA, STMEA | ✅ |  |
+| STMDB, STMFD | ✅ |  |
+| STR (imm) | ✅ |  |
+| STR (reg) | ✅ |  |
+| STRB (imm) | ❌ |  |
+| STRB (reg) | ❌ |  |
+| STRBT | ❌ |  |
+| STRD (imm) | ❌ |  |
+| STREX | ❌ | No exclusive mechanism yet |
+| STREXB | ❌ |  |
+| STREXH | ❌ |  |
+| STRH (imm) | ❌ |  |
+| STRH (reg) | ❌ |  |
+| STRHT | ❌ |  |
+| STRT | ❌ |  |
+| SUB (imm) | ✅ |  |
+| SUB (reg) | ✅ |  |
+| SUB (SP minus imm) | ❌ |  |
+| SUB (SP minus reg) | ❌ |  |
+| SVC | ❌ |  |
+| SXTAB | ❌ |  |
+| SXTAB16 | ❌ |  |
+| SXTAH | ❌ |  |
+| SXTB | ❌ |  |
+| SXTB16 | ❌ |  |
+| SXTH | ❌ |  |
+| TBB, TBH | ✅ |  |
+| TEQ (imm) | ✅ |  |
+| TEQ (reg) | ✅ |  |
+| TST (imm) | ✅ |  |
+| TST (reg) | ✅ |  |
+| UADD16 | ❌ |  |
+| UADD8 | ❌ |  |
+| UASX | ❌ |  |
+| UBFX | ❌ |  |
+| UDF | ✅ |  |
+| UDIV | ✅ |  |
+| UHADD16 | ❌ |  |
+| UHADD8 | ❌ |  |
+| UHASX | ❌ |  |
+| UHSAX | ❌ |  |
+| UHSUB16 | ❌ |  |
+| UHSUB8 | ❌ |  |
+| UMAAL | ✅ |  |
+| UMLAL | ✅ |  |
+| UMULL | ✅ |  |
+| UQADD16 | ❌ |  |
+| UQADD8 | ❌ |  |
+| UQASX | ❌ |  |
+| UQSAX | ❌ |  |
+| UQSUB16 | ❌ |  |
+| UQSUB8 | ❌ |  |
+| USAD8 | ❌ |  |
+| USADA8 | ❌ |  |
+| USAT | ❌ |  |
+| USAT16 | ❌ |  |
+| USAX | ❌ |  |
+| USUB16 | ❌ |  |
+| USUB8 | ❌ |  |
+| UXTAB | ❌ |  |
+| UXTAB16 | ❌ |  |
+| UXTAH | ❌ |  |
+| UXTB | ❌ |  |
+| UXTB16 | ❌ |  |
+| UXTH | ❌ |  |
+| VABS | ❌ |  |
+| VADD | ❌ |  |
+| VCMP, VCMPE | ❌ |  |
+| VCVTA, VCVTN, VCVTP, and VCVTM | ❌ |  |
+| VCVT, VCVTR (between floating-point and integer) | ❌ |  |
+| VCVT (between floating-point and fixed-point) | ❌ |  |
+| VCVT (between double-precision and single-precision) | ❌ |  |
+| VCVTB, VCVTT | ❌ |  |
+| VDIV | ❌ |  |
+| VFMA, VFMS | ❌ |  |
+| VFNMA, VFNMS | ❌ |  |
+| VLDM | ❌ |  |
+| VLDR | ❌ |  |
+| VMAXNM, VMINNM | ❌ |  |
+| VMLA, VMLS | ❌ |  |
+| VMOV (imm) | ❌ |  |
+| VMOV (reg) | ❌ |  |
+| VMOV (ARM core reg to scalar) | ❌ |  |
+| VMOV (scalar to ARM core reg) | ❌ |  |
+| VMOV (between ARM core reg and single-precision reg) | ❌ |  |
+| VMOV (between two ARM core regs and two single-precision regs) | ❌ |  |
+| VMOV (between two ARM core regs and a doubleword reg) | ❌ |  |
+| VMRS | ❌ |  |
+| VMSR | ❌ |  |
+| VMUL | ❌ |  |
+| VNEG | ❌ |  |
+| VNMLA, VNMLS, VNMUL | ❌ |  |
+| VPOP | ❌ |  |
+| VPUSH | ❌ |  |
+| VRINTA, VRINTN, VRINTP, and VRINTM | ❌ |  |
+| VRINTX | ❌ |  |
+| VRINTZ, VRINTR | ❌ |  |
+| VSEL | ❌ |  |
+| VSQRT | ❌ |  |
+| VSTM | ❌ |  |
+| VSTR | ❌ |  |
+| VSUB | ❌ |  |
+| WFE | ❌ |  |
+| WFI | ❌ |  |
+| YIELD | ❌ |  |
