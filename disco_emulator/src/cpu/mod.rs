@@ -4,7 +4,6 @@ use crate::{RegFormat, Condition};
 use crate::peripherals::Peripheral;
 use crate::utils::io::read_register;
 use crate::utils::bits::{bitset, add_with_carry, shift, shift_c, align};
-// use crate::instruction::{CarryChange, ShiftType};
 use crate::bytecode::{ItPos};
 
 #[derive(Debug)]

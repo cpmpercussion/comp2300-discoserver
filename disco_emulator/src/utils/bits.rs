@@ -1,12 +1,5 @@
 use crate::{Shift, ShiftType};
 
-#[derive(Copy, Clone, Debug)]
-enum CarryChange {
-    Same,
-    Set,
-    Clear,
-}
-
 pub fn bitset<T: Into<u32>>(word: T, bit: T) -> bool {
     let word = word.into();
     let bit = bit.into();

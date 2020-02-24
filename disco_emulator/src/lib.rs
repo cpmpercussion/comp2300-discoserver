@@ -582,6 +582,10 @@ impl Board {
             Opcode::Push   => self.w_push(data, extra),
             Opcode::Qadd   => self.w_qadd(data, extra),
             Opcode::Qsub   => self.w_qsub(data, extra),
+            Opcode::Rbit   => self.w_rbit(data, extra),
+            Opcode::Rev    => self.w_rev(data, extra),
+            Opcode::Rev16  => self.w_rev16(data, extra),
+            Opcode::Revsh  => self.w_revsh(data, extra),
             Opcode::RorImm => self.w_ror_imm(data, extra),
             Opcode::RorReg => self.w_ror_reg(data, extra),
             Opcode::Rrx    => self.w_rrx(data, extra),
@@ -2143,6 +2147,14 @@ impl Board {
         }
     }
 
+    fn w_rbit(&mut self, data: u32, extra: u32) {
+        // A7.7.112
+        let rd = data;
+        let rm = extra;
+
+        self.write_reg(rd, self.read_reg(rm).reverse_bits());
+    }
+
     fn n_rev(&mut self, data: u32) {
         // A7.7.113
         let rd = data & 0x7;
@@ -2151,10 +2163,29 @@ impl Board {
         self.write_reg(rd, result);
     }
 
+    fn w_rev(&mut self, data: u32, extra: u32) {
+        // A7.7.113
+        let rd = data;
+        let rm = extra;
+
+        let result = self.read_reg(rm).swap_bytes();
+        self.write_reg(rd, result);
+    }
+
     fn n_rev16(&mut self, data: u32) {
         // A7.7.114
         let rd = data & 0x7;
         let rm = data >> 3;
+
+        let result = self.read_reg(rm).rotate_left(16).swap_bytes();
+        self.write_reg(rd, result);
+    }
+
+    fn w_rev16(&mut self, data: u32, extra: u32) {
+        // A7.7.114
+        let rd = data;
+        let rm = extra;
+
         let result = self.read_reg(rm).rotate_left(16).swap_bytes();
         self.write_reg(rd, result);
     }
@@ -2163,6 +2194,17 @@ impl Board {
         // A7.7.115
         let rd = data & 0x7;
         let rm = data >> 3;
+
+        let val = self.read_reg(rm);
+        let result = shifted_sign_extend(val, 7, 8) + ((val >> 8) & 0xFF);
+        self.write_reg(rd, result);
+    }
+
+    fn w_revsh(&mut self, data: u32, extra: u32) {
+        // A7.7.115
+        let rd = data;
+        let rm = extra;
+
         let val = self.read_reg(rm);
         let result = shifted_sign_extend(val, 7, 8) + ((val >> 8) & 0xFF);
         self.write_reg(rd, result);
