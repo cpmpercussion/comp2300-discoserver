@@ -56,7 +56,7 @@ Peripherals and interrupts are not supported. Audio specifically is supported, b
 | LDRBT | ❌ |  |
 | LDRD (imm) | ❌ |  |
 | LDRD (lit) | ❌ |  |
-| LDREX | ❌ |  |
+| LDREX | ❌ | No exclusive mechanism yet |
 | LDREXB | ❌ |  |
 | LDREXH | ❌ |  |
 | LDRH (imm) | ❌ |  |
