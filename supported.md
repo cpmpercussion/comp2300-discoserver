@@ -3,13 +3,15 @@ Peripherals and interrupts are not supported. Audio specifically is supported, b
 
 ### Instructions
 
+The following table shows the expected support of the current emulator. If a box is ticked, then all encodings of that instruction are expected to work as intended. If crossed, then either all or some of the encodings will not execute properly.
+
 | Instruction | Supported | Comments |
 |-------------------|-----------|-------------|
 | ADC (imm) | ✅ |  |
 | ADC (reg) | ✅ |  |
 | ADD (imm) | ✅ |  |
 | ADD (reg) | ✅ |  |
-| ADD (SP plus imm) | ✅ | Only narrow |
+| ADD (SP plus imm) | ❌ | Only narrow |
 | ADD (SP plus reg) | ❌ |  |
 | ADR | ✅ |  |
 | AND (imm) | ✅ |  |
