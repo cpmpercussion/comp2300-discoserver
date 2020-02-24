@@ -58,21 +58,6 @@ enum AccessType {
     Normal,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ShiftType {
-    LSL,
-    LSR,
-    ASR,
-    ROR,
-    RRX,
-}
-
-#[derive(Debug)]
-pub struct Shift {
-    shift_t: ShiftType,
-    shift_n: u32,
-}
-
 // NOTE: condition checking is defined in A7.3.1 p178
 #[derive(Copy, Clone, Debug)]
 pub enum Condition {

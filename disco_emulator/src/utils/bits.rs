@@ -1,5 +1,3 @@
-use crate::{Shift, ShiftType};
-
 pub fn bitset<T: Into<u32>>(word: T, bit: T) -> bool {
     let word = word.into();
     let bit = bit.into();
@@ -12,20 +10,6 @@ pub fn matches<T: Into<u32>>(word: T, shift: T, mask: T, expected: T) -> bool {
     let mask = mask.into();
     let expected = expected.into();
     return ((word >> shift) & mask) == expected;
-}
-
-pub fn decode_imm_shift<T: Into<u32>>(encoded: T) -> Shift {
-    // A7.4.2
-    let encoded = encoded.into();
-    let shift_n = (encoded & 0x1F) as u32;
-    return match encoded >> 5 {
-        0b00 => Shift {shift_t: ShiftType::LSL, shift_n},
-        0b01 => Shift {shift_t: ShiftType::LSR, shift_n},
-        0b10 => Shift {shift_t: ShiftType::ASR, shift_n},
-        0b11 if shift_n == 0 => Shift {shift_t: ShiftType::RRX, shift_n: 1},
-        0b11 if shift_n != 0 => Shift {shift_t: ShiftType::ROR, shift_n},
-        _ => panic!(),
-    }
 }
 
 pub fn align(address: u32, size: u32) -> u32 {
@@ -169,6 +153,15 @@ pub fn split_u64(large: u64) -> (u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_bitset() {
+        for i in 0..32u32 {
+            assert!(bitset(0xFFFF_FFFF, i));
+            assert!(!bitset(0x0000_0000, i));
+            assert_eq!(bitset(0x5555_5555, i), i % 2 == 0);
+        }
+    }
 
     #[test]
     fn test_bit_field_clear() {
