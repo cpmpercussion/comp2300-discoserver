@@ -160,6 +160,7 @@ mod tests {
             assert!(bitset(0xFFFF_FFFF, i));
             assert!(!bitset(0x0000_0000, i));
             assert_eq!(bitset(0x5555_5555, i), i % 2 == 0);
+            assert_eq!(bitset(0x0010_0000, i), i == 20);
         }
     }
 
