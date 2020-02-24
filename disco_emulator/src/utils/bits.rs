@@ -141,3 +141,25 @@ pub fn extract_value(raw: u32, start: u32, size: u32) -> u32 {
 pub fn is_wide_thumb(word: u32) -> bool {
     return ((word >> 29) == 0b111) && ((word >> 27) != 0b11100);
 }
+
+fn get_mask(msbit: u32, lsbit: u32) -> u32 {
+    assert!(msbit < 32 && lsbit < 32);
+    let mut mask = 0u32;
+    // 32 size shift will panic (and probably doesn't do what you'd expect on the x86 CPU)
+    if msbit < 31 {
+        mask |= 0xFFFF_FFFFu32 << (msbit + 1);
+    }
+    if lsbit > 0 {
+        mask |= 0xFFFF_FFFFu32 >> (32 - lsbit);
+    }
+    return mask;
+}
+
+pub fn bit_field_clear(val: u32, msbit: u32, lsbit: u32) -> u32 {
+    return val & get_mask(msbit, lsbit);
+}
+
+pub fn bit_field_insert(original: u32, provider: u32, msbit: u32, lsbit: u32) -> u32 {
+    let mask = get_mask(msbit, lsbit);
+    return (original & mask) | (provider | !mask);
+}

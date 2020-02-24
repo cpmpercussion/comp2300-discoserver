@@ -543,9 +543,12 @@ impl Board {
             Opcode::AsrReg => self.w_asr_reg(data, extra),
             Opcode::Branch => self.w_branch(data, extra),
             Opcode::BranchCond => self.w_branch_cond(data, extra),
+            Opcode::Bfc    => self.w_bfc(data, extra),
+            Opcode::Bfi    => self.w_bfi(data, extra),
             Opcode::BicImm => self.w_bic_imm(data, extra),
             Opcode::BicReg => self.w_bic_reg(data, extra),
             Opcode::Bl     => self.w_bl(data, extra),
+            Opcode::Clz    => self.w_clz(data, extra),
             Opcode::CmnImm => self.w_cmn_imm(data, extra),
             Opcode::CmnReg => self.w_cmn_reg(data, extra),
             Opcode::CmpImm => self.w_cmp_imm(data, extra),
@@ -1189,6 +1192,37 @@ impl Board {
         }
     }
 
+    fn w_bfc(&mut self, data: u32, extra: u32) {
+        // A7.7.13
+        let rd = data;
+        let msbit = extra & 0x1F;
+        let lsbit = extra >> 5;
+
+        if msbit >= lsbit {
+            let result = bits::bit_field_clear(self.read_reg(rd), msbit, lsbit);
+            self.write_reg(rd, result);
+        } else {
+            println!("UNPREDICTABLE BFC");
+            self.pending_default_handler.set(true);
+        }
+    }
+
+    fn w_bfi(&mut self, data: u32, extra: u32) {
+        // A7.7.14
+        let rd = data & 0xF;
+        let rn = data >> 4;
+        let msbit = extra & 0x1F;
+        let lsbit = extra >> 5;
+
+        if msbit >= lsbit {
+            let result = bits::bit_field_insert(self.read_reg(rd), self.read_reg(rn), msbit, lsbit);
+            self.write_reg(rd, result);
+        } else {
+            println!("UNPREDICTABLE BFC");
+            self.pending_default_handler.set(true);
+        }
+    }
+
     fn w_bic_imm(&mut self, data: u32, extra: u32) {
         // A7.7.15
         let imm32 = data << 30 | extra;
@@ -1277,6 +1311,14 @@ impl Board {
         if nonzero != (self.read_reg(rn) == 0) {
             self.branch_write_pc(self.read_pc() + imm7);
         }
+    }
+
+    fn w_clz(&mut self, data: u32, extra: u32) {
+        // A7.7.24
+        let rd = data;
+        let rm = extra;
+
+        self.write_reg(rd, self.read_reg(rm).leading_zeros());
     }
 
     fn w_cmn_imm(&mut self, data: u32, extra: u32) {

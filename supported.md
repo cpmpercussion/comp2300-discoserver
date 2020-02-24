@@ -14,9 +14,35 @@ Peripherals and interrupts are not supported. Audio specifically is supported, b
 | ADR | ✅ |  |
 | AND (imm) | ✅ |  |
 | AND (reg) | ✅ |  |
-| ASR (imm) |  |  |
-| ASR (reg) |  |  |
-| B |  |  |
-| BFC |  |  |
-| BFI |  |  |
-| BIC (imm) |  |  |
+| ASR (imm) | ✅ |  |
+| ASR (reg) | ✅ |  |
+| B | ✅ |  |
+| BFC | ✅ |  |
+| BFI | ✅ |  |
+| BIC (imm) | ✅ |  |
+| BIC (reg) | ✅ |  |
+| BKPT | ✅ | Currently does nothing |
+| BL | ✅ |  |
+| BLX (reg) | ✅ |  |
+| BX | ✅ |  |
+| CBNZ, CBZ | ✅ |  |
+| CDP, CDP2 | ❌ |  |
+| CLREX | ❌ |  |
+| CLZ | ✅ |  |
+| CMN (imm) | ✅ |  |
+| CMN (reg) | ✅ |  |
+| CMP (imm) | ✅ |  |
+| CMP (reg) | ✅ |  |
+| CPS | ❌ |  |
+| CPY | ✅ | See MOV (reg) |
+| CSDB | ❌ |  |
+| DBG | ❌ |  |
+| DMB | ❌ |  |
+| DSB | ❌ |  |
+| EOR (imm) | ✅ |  |
+| EOR (reg) | ✅ |  |
+| ISB | ❌ |  |
+| IT | ✅ |  |
+| LDC, LDC2 (imm) | ❌ |  |
+| LDC, LDC2 (lit) | ❌ |  |
+| LDM, LDMIA, LDMFD | ✅ |  |
