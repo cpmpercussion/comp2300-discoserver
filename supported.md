@@ -46,3 +46,59 @@ Peripherals and interrupts are not supported. Audio specifically is supported, b
 | LDC, LDC2 (imm) | ❌ |  |
 | LDC, LDC2 (lit) | ❌ |  |
 | LDM, LDMIA, LDMFD | ✅ |  |
+| LDMDB, LDMEA |  |  |
+| LDR (imm) |  |  |
+| LDR (lit) |  |  |
+| LDR (reg) |  |  |
+| LDRB (imm) |  |  |
+| LDRB (lit) |  |  |
+| LDRB (reg) |  |  |
+| LDRBT |  |  |
+| LDRD (imm) |  |  |
+| LDRD (lit) |  |  |
+| LDREX |  |  |
+| LDREXB |  |  |
+| LDREXH |  |  |
+| LDRH (imm) |  |  |
+| LDRH (lit) |  |  |
+| LDRH (reg) |  |  |
+| LDRHT |  |  |
+| LDRSB (imm) |  |  |
+| LDRSB (lit) |  |  |
+| LDRSB (reg) |  |  |
+| LDRSBT |  |  |
+| LDRSH (imm) |  |  |
+| LDRSH (lit) |  |  |
+| LDRSH (reg) |  |  |
+| LDRSHT |  |  |
+| LDRT |  |  |
+| LSL (imm) |  |  |
+| LSL (reg) |  |  |
+| LSR (imm) |  |  |
+| LSR (reg) |  |  |
+| MCR, MCR2 |  |  |
+| MCRR, MCRR2 |  |  |
+| MLA |  |  |
+| MLS |  |  |
+| MOV (imm) |  |  |
+| MOV (reg) |  |  |
+| MOV (shifted reg) |  |  |
+| MOVT |  |  |
+| MRC, MRC2 |  |  |
+| MRRC, MRRC2 |  |  |
+| MRS |  |  |
+| MSR |  |  |
+| MUL |  |  |
+| MVN (imm) |  |  |
+| MVN (reg) |  |  |
+| NEG |  |  |
+| NOP |  |  |
+| ORN (imm) |  |  |
+| ORN (reg) |  |  |
+| ORR (imm) |  |  |
+| ORR (reg) |  |  |
+| PKHBT, PKHTB |  |  |
+| PLD (imm) |  |  |
+| PLD (lit) |  |  |
+| PLD (reg) |  |  |
+| PLI (imm, lit) |  |  |
