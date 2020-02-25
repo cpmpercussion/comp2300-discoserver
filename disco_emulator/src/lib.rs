@@ -62,7 +62,7 @@ pub enum Location {
 
 #[derive(Debug)]
 pub struct ExclusiveMonitors {
-    region: Option<(u32, u32)>,
+    region: Option<()>,
 }
 
 // NOTE: This implementation does not reflect the intricacy
@@ -75,8 +75,8 @@ impl ExclusiveMonitors {
         }
     }
 
-    fn set_exclusive_monitors(&mut self, address: u32, size: u32) {
-        self.region = Some((address, size));
+    fn set_exclusive_monitors(&mut self, _address: u32, _size: u32) {
+        self.region = Some(());
     }
 
     fn exclusive_monitors_pass(&mut self, address: u32, size: u32) -> Result<bool, Exception> {
@@ -92,9 +92,9 @@ impl ExclusiveMonitors {
         return Ok(passed);
     }
 
-    fn is_exclusive_local(&self, address: u32, _size: u32) -> bool {
+    fn is_exclusive_local(&self, _address: u32, _size: u32) -> bool {
         return match self.region {
-            Some((start, length)) => start <= address && address <= start + length, // TODO: Check implementation defined behaviour for non-contained overlap handling
+            Some(()) => true,
             None => false,
         }
     }

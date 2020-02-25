@@ -586,3 +586,29 @@ fn lsl() {
     assert!(!board.cpu.read_carry_flag());
     assert_eq!(board.read_reg(10u32), 0xCCDD_0000);
 }
+
+#[test]
+fn exclusive() {
+    let mut board = load_program("exclusive").unwrap();
+
+    board.step_n(3).unwrap();
+    assert_eq!(board.memory.read_mem_u(0x2000_0000, 4).unwrap(), 0xDEAD_BEE1);
+
+    board.step_n(3).unwrap();
+    assert_eq!(board.read_reg(1u32), 0);
+    assert_eq!(board.memory.read_mem_u(0x2000_0000, 4).unwrap(), 0x0000_00FF);
+
+    board.step_n(1).unwrap();
+    assert_eq!(board.read_reg(1u32), 1);
+    assert_eq!(board.memory.read_mem_u(0x2000_0000, 4).unwrap(), 0x0000_00FF);
+
+    board.step_n(5).unwrap();
+    assert_eq!(board.read_reg(4u32), 0);
+
+    board.step_n(1).unwrap();
+    assert_eq!(board.read_reg(4u32), 1);
+
+    board.step_n(4).unwrap();
+    assert_eq!(board.read_reg(3u32), 1);
+    assert_ne!(board.memory.read_mem_u(0x2000_0000, 4).unwrap(), 0xDEAD_BEE2);
+}
