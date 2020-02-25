@@ -1,5 +1,5 @@
 use crate::{ByteInstruction};
-use crate::utils::bits::{bitset, is_wide_thumb};
+use crate::utils::bits::is_wide_thumb;
 use std::fmt;
 
 mod narrow;

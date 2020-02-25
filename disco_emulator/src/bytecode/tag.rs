@@ -1,5 +1,4 @@
 use crate::{ByteInstruction};
-use crate::utils::bits::{bitset};
 use super::opcode::{Opcode, from_opcode, to_opcode};
 use super::{ItPos, InstructionContext};
 

@@ -1,4 +1,3 @@
-use crate::{ByteInstruction};
 use crate::utils::bits::{bitset, matches};
 use super::{ItPos, InstructionContext};
 use super::opcode::{Opcode};
