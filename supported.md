@@ -11,7 +11,7 @@ The following table shows the expected support of the current emulator. If a box
 | ADC (reg) | ✅ |  |
 | ADD (imm) | ✅ |  |
 | ADD (reg) | ✅ |  |
-| ADD (SP plus imm) | ❌ | Only narrow |
+| ADD (SP plus imm) | ❌ |  |
 | ADD (SP plus reg) | ❌ |  |
 | ADR | ✅ |  |
 | AND (imm) | ✅ |  |

@@ -7,7 +7,6 @@ pub enum Opcode {
     AddImm, // N: blank[2]-rn[3]-rd[3]-imm8[8] / W: blank[3]-setflags[1]-rn[4]-rd[4]-spill[4] + modified[30]
     AddReg, // N: blank[3]-setflags[1]-rn[4]-rm[4]-rd[4] / W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[22]-shift_n[6]-shift_t[3]
     AddSpImm, // N: blank[2]-rd[4]-offset[10]
-    AddSpReg,
     Adr,    // N: blank[3]-rd[3]-offset[10] / W: blank[12]-rd[4]- + blank[17]-sign[1]-imm12[12]
     AndImm, // W: blank[3]-setflags[1]-rn[4]-rd[4]-spill[4] + modified[30]
     AndReg, // N: blank[10]-rm[3]-rdn[3] / W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[22]-shift_n[6]-shift_t[3]

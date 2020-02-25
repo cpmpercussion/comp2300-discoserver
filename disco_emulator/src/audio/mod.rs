@@ -18,10 +18,6 @@ impl AudioHandler {
         };
     }
 
-    fn aquire(&mut self, rt: SyncSender<i16>) {
-        self.sender = Some(rt);
-    }
-
     pub fn handle(&mut self, amplitude: i16) {
         self.samples += 1;
         match &self.sender {

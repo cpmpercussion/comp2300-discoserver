@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-// #![allow(unused_variables)]
 
 extern crate goblin;
 
@@ -265,22 +264,6 @@ impl MemoryBus {
         return Ok(location);
     }
 
-    fn read_word(&self, address: u32) -> Result<u32, MemError> {
-        return self.read_mem_u(address, 4);
-    }
-
-    fn read_halfword(&self, address: u32) -> Result<u16, MemError> {
-        return Ok(self.read_mem_u(address, 2)? as u16);
-    }
-
-    fn read_byte(&self, address: u32) -> Result<u8, MemError> {
-        return Ok(self.read_mem_u(address, 1)? as u8);
-    }
-
-    fn read_byte_unpriv(&self, address: u32) -> Result<u8, MemError> {
-        return self.read_byte(address);
-    }
-
     fn write_mem_u(&mut self, address: u32, size: usize, value: u32) -> Result<(), MemError> {
         let location = self.address_to_physical(address)?;
         return match location {
@@ -295,10 +278,6 @@ impl MemoryBus {
     fn write_mem_a(&mut self, address: u32, size: usize, value: u32) -> Result<(), MemError> {
         // TODO
         return self.write_mem_u(address, size, value);
-    }
-
-    fn write_word(&mut self, address: u32, value: u32) -> Result<(), MemError> {
-        return self.write_mem_u(address, 4, value);
     }
 }
 
@@ -471,18 +450,6 @@ impl Board {
         let wide = tag::is_wide(start);
         self.cpu.inc_pc(wide);
         return Ok((instruction, wide));
-    }
-
-    /**
-     * Decode: Retrieves and returns the opcode from the instruction. Additionally
-     * may raise an exception if the instruction is unpredictable, and could return
-     * a modified version that is safe (consistent with the real board) to execute
-     * if unpredictable behaviour is enabled.
-     *
-     * TODO
-     */
-    fn decode(&self, instruction: ByteInstruction) -> Opcode {
-        return tag::get_opcode(tag::from(instruction));
     }
 
     /**
@@ -738,28 +705,16 @@ impl Board {
     }
 
     pub fn read_memory_region(&self, start: u32, bytes: u32) -> Result<Vec<u8>, String> {
-        let mut out = Vec::new();
+        let mut out: Vec<u8> = Vec::new();
         for i in start..(start.saturating_add(bytes)) {
-            match self.memory.read_byte(i) {
-                Ok(i) => out.push(i),
+            match self.memory.read_mem_u(i, 1) {
+                Ok(i) => out.push(i as u8),
                 Err(_) => {
                     return Ok(out);
                 }
             };
         }
         return Ok(out);
-    }
-
-    fn write_memory_region(&mut self, start: u32, bytes: Vec<u8>) -> Result<(), ()> {
-        for i in start..(start.saturating_add(bytes.len() as u32)) {
-            match self.memory.write_mem_u(i, 1, bytes[(i - start) as usize].into()) {
-                Ok(_) =>{},
-                Err(_) => {
-                    return Ok(());
-                }
-            };
-        }
-        return Ok(());
     }
 
     pub fn read_reg<T: Into<u32>>(&self, reg: T) -> u32 {
@@ -788,11 +743,6 @@ impl Board {
         };
     }
 
-    fn set_display_format(&mut self, reg: u8, kind: RegFormat) {
-        assert!(reg <= 15);
-        self.register_formats[reg as usize] = kind;
-    }
-
     pub fn read_sp(&self) -> u32 {
         return self.cpu.read_sp();
     }
@@ -815,10 +765,6 @@ impl Board {
 
     fn set_pc(&mut self, address: u32) {
         self.cpu.write_instruction_pc(address);
-    }
-
-    fn inc_pc(&mut self, wide: bool) {
-        self.cpu.inc_pc(wide);
     }
 
     fn get_shifted_register(&self, reg_val: u32, shift_t: u32, shift_n: u32) -> u32 {
@@ -941,15 +887,6 @@ impl Board {
     fn alu_write_pc(&mut self, address: u32) {
         // A2.3.1 p31
         self.branch_write_pc(address);
-    }
-
-    fn processor_id(&self) -> u32 {
-        return 0;
-    }
-
-    fn clear_exclusive_local(&mut self, _processor_id: u32) {
-        // B2.3.7 p587
-        // TODO
     }
 
     fn set_exclusive_monitors(&mut self, address: u32, length: u32) {
@@ -1079,15 +1016,6 @@ impl Board {
         let imm10 = data & 0x3FF;
         let rd = data >> 10;
         self.write_reg(rd, self.read_sp().wrapping_add(imm10));
-    }
-
-    fn w_add_sp_imm(&mut self, rd: u8, imm32: u32, setflags: bool) {
-        // A7.7.5
-        let (result, carry, overflow) = add_with_carry(self.read_sp(), imm32, 0);
-        self.write_reg(rd, result);
-        if setflags {
-            self.set_flags_nzcv(result, carry, overflow);
-        }
     }
 
     fn n_adr(&mut self, data: u32) {
