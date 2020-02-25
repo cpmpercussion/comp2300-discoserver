@@ -31,9 +31,9 @@ pub fn sign_extend(num: u32, bits: u32) -> u32 {
  * bits are cleared (pre shift). Therefore, it is safe to use directly in
  * an encoding such as foo[8]-offset[8]
  */
-pub fn shifted_sign_extend(value: u32, bits: u32, shift: u32) -> u32 {
-    assert!(bits < 32 && shift < 32);
-    return (((value << (31 - bits)) as i32) >> (31 - bits - shift)) as u32;
+pub fn shifted_sign_extend(value: u32, sign_bit: u32, shift: u32) -> u32 {
+    assert!(sign_bit < 32 && shift < 32);
+    return (((value << (31 - sign_bit)) as i32) >> (31 - sign_bit - shift)) as u32;
 }
 
 pub fn ror_c(input: u32, shift: u32) -> (u32, bool) {
@@ -45,8 +45,9 @@ pub fn ror_c(input: u32, shift: u32) -> (u32, bool) {
 
 pub fn rrx_c(input: u32, carry_in: u32) -> (u32, bool) {
     // p27
+    assert!(carry_in == 1 || carry_in == 0);
     let result = (input >> 1) + (carry_in << 31);
-    let carry_out = bitset(result, 0);
+    let carry_out = bitset(input, 0);
     return (result, carry_out);
 }
 
@@ -57,24 +58,44 @@ pub fn rrx(input: u32, carry_in: u32) -> u32 {
 
 pub fn lsl_c(input: u32, shift: u32) -> (u32, bool) {
     // p26
-    let result = input.checked_shl(shift).unwrap_or(0);
-    let carry_out = bitset(input, 32 - shift);
-    return (result, carry_out);
+    return match shift {
+        0..=31 => {
+            let result = input << shift;
+            let carry_out = bitset(input, 32 - shift);
+            (result, carry_out)
+        }
+        32 => (0, bitset(input, 0)),
+        _ => (0, false),
+    }
 }
 
 pub fn lsr_c(input: u32, shift: u32) -> (u32, bool) {
     // p26
-    let result = input.checked_shr(shift).unwrap_or(0);
-    let carry_out = bitset(input, shift - 1);
-    return (result, carry_out);
+    return match shift {
+        0..=31 => {
+            let result = input >> shift;
+            let carry_out = bitset(input, shift - 1);
+            (result, carry_out)
+        }
+        32 => (0, bitset(input, 31)),
+        _ => (0, false),
+    }
 }
 
-pub fn asr_c(input: u32, mut shift: u32) -> (u32, bool) {
+pub fn asr_c(input: u32, shift: u32) -> (u32, bool) {
     // p27
-    if shift >= 32 { shift = 31; } // safe, because 32 shift == 31 shift with ASR
-    let result = ((input as i32) >> shift) as u32;
-    let carry_out = bitset(input, shift - 1);
-    return (result, carry_out);
+    return match shift {
+        0..=31 => {
+            let result = ((input as i32) >> shift) as u32;
+            let carry_out = bitset(input, shift - 1);
+            (result, carry_out)
+        }
+        _ => {
+            // 32 and greater cases are the same
+            let result = ((input as i32) >> 31) as u32;
+            (result, bitset(result, 0))
+        }
+    }
 }
 
 pub fn shift_c(input: u32, shift_t: u32, shift_n: u32, carry_in: u32) -> (u32, bool) {
@@ -162,6 +183,70 @@ mod tests {
             assert_eq!(bitset(0x5555_5555, i), i % 2 == 0);
             assert_eq!(bitset(0x0010_0000, i), i == 20);
         }
+    }
+
+    #[test]
+    fn test_matches() {
+        assert!(matches(0b1100_1010, 4, 0b0110u32, 0b0100u32));
+    }
+
+    #[test]
+    fn test_align() {
+        assert_eq!(align(0b1111, 1), 0b1111);
+        assert_eq!(align(0b1111, 2), 0b1110);
+        assert_eq!(align(0b1111, 4), 0b1100);
+    }
+
+    #[test]
+    fn test_shifted_sign_extend() {
+        assert_eq!(shifted_sign_extend(0xFF, 7, 0), 0xFFFF_FFFF);
+        assert_eq!(shifted_sign_extend(0xFF, 8, 0), 0x0000_00FF);
+        assert_eq!(shifted_sign_extend(0xFF, 7, 4), 0xFFFF_FFF0);
+        assert_eq!(shifted_sign_extend(0xAABB_77DD, 15, 4), 0x0007_7DD0);
+        assert_eq!(shifted_sign_extend(0xAABB_87DD, 15, 4), 0xFFF8_7DD0);
+        assert_eq!(shifted_sign_extend(0xAABB_87DD, 31, 0), 0xAABB_87DD);
+    }
+
+    #[test]
+    fn test_ror_c() {
+        assert_eq!(ror_c(0x0000_00AF, 4), (0xF000_000A, true));
+        assert_eq!(ror_c(0x0000_00F7, 4), (0x7000_000F, false));
+    }
+
+    #[test]
+    fn test_rrx_c() {
+        assert_eq!(rrx_c(0x0000_0001, 1), (0x8000_0000, true));
+        assert_eq!(rrx_c(0x0000_0001, 0), (0x0000_0000, true));
+        assert_eq!(rrx_c(0xAAAA_AAAA, 1), (0xD555_5555, false));
+    }
+
+    #[test]
+    fn test_lsl_c() {
+        assert_eq!(lsl_c(0xFFFF_FFFF, 255), (0x0000_0000, false));
+        assert_eq!(lsl_c(0xFFFF_FFFF, 32), (0x0000_0000, true));
+        assert_eq!(lsl_c(0xFFFF_FFFF, 1), (0xFFFF_FFFE, true));
+        assert_eq!(lsl_c(0x0001_ABCD, 16), (0xABCD_0000, true));
+        assert_eq!(lsl_c(0x0000_ABCD, 16), (0xABCD_0000, false));
+    }
+
+    #[test]
+    fn test_lsr_c() {
+        assert_eq!(lsr_c(0xFFFF_FFFF, 255), (0x0000_0000, false));
+        assert_eq!(lsr_c(0xFFFF_FFFF, 32), (0x0000_0000, true));
+        assert_eq!(lsr_c(0xFFFF_FFFF, 1), (0x7FFF_FFFF, true));
+        assert_eq!(lsr_c(0xAABB_CC80, 8), (0x00AA_BBCC, true));
+        assert_eq!(lsr_c(0xAABB_CC00, 8), (0x00AA_BBCC, false));
+    }
+
+    #[test]
+    fn test_asr_c() {
+        assert_eq!(asr_c(0x8000_0000, 255), (0xFFFF_FFFF, true));
+        assert_eq!(asr_c(0x7000_0000, 255), (0x0000_0000, false));
+        assert_eq!(asr_c(0x8000_0000, 32), (0xFFFF_FFFF, true));
+        assert_eq!(asr_c(0x7000_0000, 32), (0x0000_0000, false));
+        assert_eq!(asr_c(0xFFFF_FFFF, 1), (0xFFFF_FFFF, true));
+        assert_eq!(asr_c(0xAABB_CC80, 8), (0xFFAA_BBCC, true));
+        assert_eq!(asr_c(0xAABB_CC00, 8), (0xFFAA_BBCC, false));
     }
 
     #[test]
