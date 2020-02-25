@@ -112,10 +112,54 @@ pub enum Location {
     Peripheral(u32), // we keep the passed address, and resolve in more detail
 }
 
+#[derive(Debug)]
+pub struct ExclusiveMonitors {
+    region: Option<(u32, u32)>,
+}
+
+// NOTE: This implementation does not reflect the intricacy
+//       of the actual process. It serves for just LDREX and
+//       STREX support on a single processor though.
+impl ExclusiveMonitors {
+    fn new() -> ExclusiveMonitors {
+        return ExclusiveMonitors {
+            region: None,
+        }
+    }
+
+    fn set_exclusive_monitors(&mut self, address: u32, size: u32) {
+        self.region = Some((address, size));
+    }
+
+    fn exclusive_monitors_pass(&mut self, address: u32, size: u32) -> Result<bool, Exception> {
+        if address != bits::align(address, size) {
+            // UFSR.UNALIGNED = ‘1’;
+            return Err(Exception::UsageFault);
+        }
+
+        let passed = self.is_exclusive_local(address, size);
+        if passed {
+            self.clear_exclusive_local();
+        }
+        return Ok(passed);
+    }
+
+    fn is_exclusive_local(&self, address: u32, size: u32) -> bool {
+        return match self.region {
+            Some((start, length)) => start <= address && address <= start + length, // TODO: Check implementation defined behaviour for non-contained overlap handling
+            None => false,
+        }
+    }
+
+    fn clear_exclusive_local(&mut self) {
+        self.region = None;
+    }
+}
+
 pub struct MemoryBus {
     flash: Box<[u8]>,
     data: Box<[u8]>,
-    peripherals: Peripherals
+    peripherals: Peripherals,
 }
 
 impl fmt::Debug for MemoryBus {
@@ -320,6 +364,9 @@ pub struct Board {
     register_formats: [RegFormat; 16],
     branch_map: HashMap<u32, String>,
 
+    // WIP: Still needs testing against actual board
+    exclusive_monitors: ExclusiveMonitors,
+
     // HACK: To trigger default handler
     pending_default_handler: std::cell::Cell<bool>,
 }
@@ -339,6 +386,7 @@ impl Board {
             memory: MemoryBus::new(),
             register_formats: [RegFormat::Hex; 16],
             branch_map: HashMap::new(),
+            exclusive_monitors: ExclusiveMonitors::new(),
             pending_default_handler: std::cell::Cell::new(false),
         };
     }
@@ -533,6 +581,7 @@ impl Board {
             Opcode::BicImm => self.w_bic_imm(data, extra),
             Opcode::BicReg => self.w_bic_reg(data, extra),
             Opcode::Bl     => self.w_bl(data, extra),
+            Opcode::Clrex  => self.w_clrex(data, extra),
             Opcode::Clz    => self.w_clz(data, extra),
             Opcode::CmnImm => self.w_cmn_imm(data, extra),
             Opcode::CmnReg => self.w_cmn_reg(data, extra),
@@ -923,8 +972,22 @@ impl Board {
         // TODO
     }
 
-    fn set_exclusive_monitors(&mut self, _address: u32, _length: u32) {
-        // TODO
+    fn set_exclusive_monitors(&mut self, address: u32, length: u32) {
+        self.exclusive_monitors.set_exclusive_monitors(address, length);
+    }
+
+    fn exclusive_monitors_pass(&mut self, address: u32, length: u32) -> bool {
+        return match self.exclusive_monitors.exclusive_monitors_pass(address, length) {
+            Ok(passed) => passed,
+            Err(e) => {
+                self.pending_default_handler.set(true);
+                return false;
+            }
+        }
+    }
+
+    fn exclusive_monitors_clear(&mut self) {
+        self.exclusive_monitors.clear_exclusive_local();
     }
 
     /**
@@ -1304,6 +1367,10 @@ impl Board {
         }
     }
 
+    fn w_clrex(&mut self, _data: u32, _extra: u32) {
+        self.exclusive_monitors_clear();
+    }
+
     fn w_clz(&mut self, data: u32, extra: u32) {
         // A7.7.24
         let rd = data;
@@ -1607,7 +1674,6 @@ impl Board {
     }
 
     fn w_ldrex(&mut self, data: u32, extra: u32) {
-        // TODO: Exclusive tracking
         let rt = data;
         let imm10 = extra & 0x3FF;
         let rn = extra >> 10;
@@ -2503,7 +2569,7 @@ impl Board {
         let rn = extra >> 10;
 
         let address = self.read_reg(rn).wrapping_add(imm10);
-        if /* ExclusiveMonitorsPass(address,4) */ true {
+        if self.exclusive_monitors_pass(address,4) {
             self.memory.write_mem_a(address, 4, self.read_reg(rt)).unwrap_or_default();
             self.write_reg(rd, 0);
         } else {

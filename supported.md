@@ -29,7 +29,7 @@ The following table shows the expected support of the current emulator. If a box
 | BX | ✅ |  |
 | CBNZ, CBZ | ✅ |  |
 | CDP, CDP2 | ❌ |  |
-| CLREX | ❌ |  |
+| CLREX | ✅ |  |
 | CLZ | ✅ |  |
 | CMN (imm) | ✅ |  |
 | CMN (reg) | ✅ |  |
@@ -58,7 +58,7 @@ The following table shows the expected support of the current emulator. If a box
 | LDRBT | ❌ |  |
 | LDRD (imm) | ❌ |  |
 | LDRD (lit) | ❌ |  |
-| LDREX | ❌ | No exclusive mechanism yet |
+| LDREX | ✅ |  |
 | LDREXB | ❌ |  |
 | LDREXH | ❌ |  |
 | LDRH (imm) | ❌ |  |
@@ -172,7 +172,7 @@ The following table shows the expected support of the current emulator. If a box
 | STRB (reg) | ❌ |  |
 | STRBT | ❌ |  |
 | STRD (imm) | ❌ |  |
-| STREX | ❌ | No exclusive mechanism yet |
+| STREX | ✅ |  |
 | STREXB | ❌ |  |
 | STREXH | ❌ |  |
 | STRH (imm) | ❌ |  |
