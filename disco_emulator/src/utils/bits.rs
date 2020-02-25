@@ -96,10 +96,10 @@ pub fn asr_c(input: u32, shift: u32) -> (u32, bool) {
     }
 }
 
-// Combination of DecodeImmShift and Shift_C. shift_n has already been adjusted for asr/lsr
+// NOTE: shift_n has already been adjusted for asr/lsr
 pub fn shift_c(input: u32, shift_t: u32, shift_n: u32, carry_in: u32) -> (u32, bool) {
     // A7.4.2
-    if shift_n == 0 && shift_t != 0b11 {
+    if shift_n == 0 {
         return (input, carry_in == 1);
     }
     return match shift_t {
