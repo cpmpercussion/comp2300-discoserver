@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 mod common;
 use common::{load_program, load_and_step, load_and_wait};
 
@@ -341,6 +339,9 @@ fn ldr() {
 
     // LDR (reg) T2
     board.step_n(3).unwrap();
+    assert_eq!(board.read_reg(2u32), 0x1777C);
+
+    board.step_n(2).unwrap();
     assert_eq!(board.read_reg(2u32), 16);
 
     // LDR (lit) T1
@@ -530,4 +531,58 @@ fn bx() {
 
     board.step().unwrap();
     assert_eq!(board.cpu.read_instruction_pc(), origin_pc - 16);
+}
+
+#[test]
+fn lsl() {
+    let mut board = load_program("lsl").unwrap();
+
+    // LSL (imm) T1
+    board.step_n(4).unwrap();
+    assert!(!board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(1u32), 0xFFFF_FFFF);
+
+    board.step_n(1).unwrap();
+    assert!(board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(1u32), 0x8000_0000);
+
+    board.step_n(2).unwrap();
+    assert!(!board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(1u32), 0xFFFF_0000);
+
+    // LSL (imm) T2
+    board.step_n(4).unwrap();
+    assert!(!board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(0u32), 0x7FFF_FFFF);
+    assert_eq!(board.read_reg(1u32), 0xFFFF_FFFE);
+
+    board.step_n(1).unwrap();
+    assert!(board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(1u32), 0xFFFF_FFFC);
+
+    // LSL (reg) T1
+    board.step_n(3).unwrap();
+    assert!(!board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(0u32), 0x0000_0000);
+
+    board.step_n(3).unwrap();
+    assert!(board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(0u32), 0x0000_0000);
+
+    board.step_n(3).unwrap();
+    assert!(!board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(0u32), 0xCCDD_0000);
+
+    // LSL (reg) T2
+    board.step_n(3).unwrap();
+    assert!(!board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(10u32), 0x0000_0000);
+
+    board.step_n(3).unwrap();
+    assert!(board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(10u32), 0x0000_0000);
+
+    board.step_n(3).unwrap();
+    assert!(!board.cpu.read_carry_flag());
+    assert_eq!(board.read_reg(10u32), 0xCCDD_0000);
 }

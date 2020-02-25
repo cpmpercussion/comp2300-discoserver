@@ -45,6 +45,8 @@ main:
 
   @ LDR (reg) T2
   ldr r0, =_data_start_ram
+  ldr r1, =0x1777C
+  ldr.W r2, [r0, r1]
   mov r1, 2
   ldr.W r2, [r0, r1, LSL 3]
 
