@@ -131,10 +131,6 @@ pub fn add_with_carry(x: u32, y: u32, carry_in: u32) -> (u32, bool, bool) {
     return (result as u32, carry_out, overflow);
 }
 
-pub fn extract_value(raw: u32, start: u32, size: u32) -> u32 {
-    return (raw >> start) & (!0 >> (32 - size));
-}
-
 pub fn is_wide_thumb(word: u32) -> bool {
     return ((word >> 29) == 0b111) && ((word >> 27) != 0b11100);
 }
@@ -246,6 +242,15 @@ mod tests {
         assert_eq!(asr_c(0xFFFF_FFFF, 1), (0xFFFF_FFFF, true));
         assert_eq!(asr_c(0xAABB_CC80, 8), (0xFFAA_BBCC, true));
         assert_eq!(asr_c(0xAABB_CC00, 8), (0xFFAA_BBCC, false));
+    }
+
+    #[test]
+    fn test_add_with_carry() {
+        assert_eq!(add_with_carry(0xFFFF_FFFF, 0xFFFF_FFFF, 0), (0xFFFF_FFFE, true, false));
+        assert_eq!(add_with_carry(0xFFFF_FFFF, 0xFFFF_FFFF, 1), (0xFFFF_FFFF, true, false));
+        assert_eq!(add_with_carry(0x0000_FFFF, 0xFFFF_0000, 1), (0x0000_0000, true, false));
+        assert_eq!(add_with_carry(0x7FFF_FFFF, 0x0000_0001, 0), (0x8000_0000, false, true));
+        assert_eq!(add_with_carry(0x7FFF_FFFF, 0x7FFF_FFFF, 0), (0xFFFF_FFFE, false, true));
     }
 
     #[test]
