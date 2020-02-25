@@ -89,7 +89,7 @@ impl AudioHandler {
                             }
                         }
                     },
-                    kind => {
+                    _ => {
                         panic!("unrecognised stream data kind");
                     }
                 }

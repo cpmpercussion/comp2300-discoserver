@@ -182,14 +182,14 @@ fn id_special_data_branch(hword: u16, c: Context) -> u32 {
 fn id_ldr_str_single(hword: u16, c: Context) -> u32 {
     // A5.2.4
     let op_a = hword >> 12;
+    let op_b = (hword >> 9) & 0b111;
     assert!(op_a == 0b0101 || op_a == 0b0110 || op_a == 0b0111 || op_a == 0b1000 || op_a == 0b1001);
     let op_c = bitset(hword, 11);
-    let rm = (hword >> 6) & 0b111;
     let rn = (hword >> 3) & 0b111;
     let rt = hword & 0b111;
     return match op_a {
         0b0101 => {
-            let opcode = match (hword >> 9) & 0b111 {
+            let opcode = match op_b {
                 0b000 => Opcode::StrReg, // A7.7.162 T1
                 0b001 => Opcode::StrhReg, // A7.7.171 T1
                 0b010 => Opcode::StrbReg, // A7.7.164 T1
@@ -306,18 +306,15 @@ fn id_if_then_hints(hword: u16, c: Context) -> u32 {
     let op_a = (hword >> 4) & 0xF;
     let op_b = hword & 0xF;
 
-    return if hword & 0xF != 0 {
-        let base = tag::get_narrow(Opcode::It, c, hword & 0xFF); // A7.7.38 T1
-        let base = if (hword & (0xF << 4)) == 0 || (hword & (0xF << 4) == 0xE && (hword & 0xF).count_ones() != 1) {
-            tag::as_unpred(base)
-        } else {
-            base
+    return if op_b != 0 {
+        let mut base = tag::get_narrow(Opcode::It, c, hword & 0xFF); // A7.7.38 T1
+        if op_a == 0 || (op_a == 0xE && op_b.count_ones() != 1) {
+            base = tag::as_unpred(base);
         };
         if c.it_pos != ItPos::None {
-            tag::as_unpred_it(base)
-        } else {
-            base
-        }
+            base = tag::as_unpred_it(base);
+        };
+        base
     } else {
         let opcode = match op_a {
             0b0000 => Opcode::Nop, // A7.7.88 T1

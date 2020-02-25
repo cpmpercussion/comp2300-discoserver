@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-#![allow(unused_variables)]
+// #![allow(unused_variables)]
 
 extern crate goblin;
 
@@ -93,7 +93,7 @@ impl ExclusiveMonitors {
         return Ok(passed);
     }
 
-    fn is_exclusive_local(&self, address: u32, size: u32) -> bool {
+    fn is_exclusive_local(&self, address: u32, _size: u32) -> bool {
         return match self.region {
             Some((start, length)) => start <= address && address <= start + length, // TODO: Check implementation defined behaviour for non-contained overlap handling
             None => false,
@@ -218,7 +218,6 @@ impl MemoryBus {
         if address != align(address, size as u32) {
             // Set UFSR.UNALIGNED = true;
             println!("UsageFault: unaligned memory access");
-            let hard_fault_handler = read_value(&*self.flash, 4 * 3, 4);
             return Err(MemError::Unaligned);
         }
 
@@ -402,7 +401,7 @@ impl Board {
     fn read_mem_u(&self, address: u32, size: usize) -> u32 {
         return match self.memory.read_mem_u(address, size) {
             Ok(v) => v,
-            Err(e) => {
+            Err(_) => {
                 self.pending_default_handler.set(true);
                 0
             }
@@ -412,7 +411,7 @@ impl Board {
     fn read_mem_a(&self, address: u32, size: usize) -> u32 {
         return match self.memory.read_mem_a(address, size) {
             Ok(v) => v,
-            Err(e) => {
+            Err(_) => {
                 self.pending_default_handler.set(true);
                 0
             }
@@ -960,7 +959,7 @@ impl Board {
     fn exclusive_monitors_pass(&mut self, address: u32, length: u32) -> bool {
         return match self.exclusive_monitors.exclusive_monitors_pass(address, length) {
             Ok(passed) => passed,
-            Err(e) => {
+            Err(_) => {
                 self.pending_default_handler.set(true);
                 return false;
             }
@@ -1206,7 +1205,7 @@ impl Board {
         self.branch_write_pc(self.read_pc().wrapping_add(imm32));
     }
 
-    fn w_branch(&mut self, data: u32, extra: u32) {
+    fn w_branch(&mut self, _data: u32, extra: u32) {
         // A7.7.12
         let imm24 = extra;
         let imm32 = shifted_sign_extend(imm24, 23, 1);
@@ -1300,12 +1299,12 @@ impl Board {
         }
     }
 
-    fn n_bkpt(&mut self, data: u32) {
+    fn n_bkpt(&mut self, _data: u32) {
         // A7.7.17
         // TODO: When return values supported, cause a DebugMonitor exception with the input id
     }
 
-    fn w_bl(&mut self, data: u32, extra: u32) {
+    fn w_bl(&mut self, _data: u32, extra: u32) {
         // A7.7.18
         let pc = self.read_pc();
         self.write_lr(pc | 0b1);
@@ -1424,7 +1423,7 @@ impl Board {
         self.set_flags_nzcv(result, carry, overflow);
     }
 
-    fn n_cps(&mut self, data: u32) {
+    fn n_cps(&mut self, _data: u32) {
         // A7.7.29
         // B5.2.1
         // TODO
@@ -2289,12 +2288,11 @@ impl Board {
         }
     }
 
-    fn w_rrx(&mut self, data: u32, extra: u32) {
+    fn w_rrx(&mut self, data: u32, _extra: u32) {
         // A7.7.118
         let rd = data & 0xF;
         let rm = (data >> 4) & 0xF;
         let setflags = bitset(data, 8);
-        let shift_n = extra;
 
         let (result, carry) = bits::rrx_c(self.read_reg(rm), self.cpu.read_carry_flag() as u32);
         self.write_reg(rd, result);
@@ -2640,7 +2638,7 @@ impl Board {
         self.write_sp(result);
     }
 
-    fn n_svc(&mut self, data: u32) {
+    fn n_svc(&mut self, _data: u32) {
         // A7.7.178
         // TODO: CallSupervisor()
     }

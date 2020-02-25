@@ -61,19 +61,19 @@ pub fn decode_thumb_wide(word: u32, c: InstructionContext) -> ByteInstruction {
 }
 
 fn id_coprocessor_instr(word: u32, c: Context) -> ByteInstruction {
-    // A5.3.18 // DONE
+    // A5.3.18 // Need to parse params
     assert!(matches(word, 26, 0b111_0_11, 0b111_0_11));
     let op1 = (word >> 20) & 0x3F;
-    let coproc = (word >> 8) & 0xF;
+    let _coproc = (word >> 8) & 0xF;
     let op = (word >> 4) & 0b1;
 
     let p = (word >> 24) & 0b1;
-    let u = (word >> 23) & 0b1;
-    let d = (word >> 22) & 0b1; // Bug in manual
+    let _u = (word >> 23) & 0b1;
+    let _d = (word >> 22) & 0b1; // Bug in manual
     let w = (word >> 21) & 0b1;
     let rn = (word >> 16) & 0xF;
     let crd = (word >> 12) & 0xF;
-    let imm8 = word & 0xFF;
+    let _imm8 = word & 0xFF;
 
     if (op1 & 0b10_0001 == 0b00_0000) && (op1 & 0b11_1010 != 0b00_0000) {
         let mut base = tag::get_wide(Opcode::Stc, c, 0, 0);
@@ -1258,10 +1258,10 @@ fn id_load_byte(word: u32, c: Context) -> ByteInstruction {
     // A5.3.9
     assert!(matches(word, 20, 0b111_1111_00_11_1, 0b111_1100_00_00_1));
 
-    let op1 = (word >> 23) & 0b11;
-    let rn = (word >> 16) & 0xF;
-    let rt = (word >> 12) & 0xF;
-    let op2 = (word >> 6) & 0x3F;
+    let _op1 = (word >> 23) & 0b11;
+    let _rn = (word >> 16) & 0xF;
+    let _rt = (word >> 12) & 0xF;
+    let _op2 = (word >> 6) & 0x3F;
 
     return tag::get_unimplemented_wide(c, word);
 }
