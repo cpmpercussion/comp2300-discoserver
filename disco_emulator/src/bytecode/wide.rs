@@ -136,6 +136,25 @@ fn id_coprocessor_instr(word: u32, c: Context) -> ByteInstruction {
     return tag::get_undefined_wide(c, word);
 }
 
+// Takes type[2] and imm5[5] from encoding, returns shift_t[3] and shift_n[6]
+fn decode_imm_shift(initial_t: u32, initial_n: u32) -> (u32, u32) {
+    let shift_n = if initial_n == 0 && (initial_t == 0b01 || initial_t == 0b10) {
+        32
+    } else {
+        initial_n
+    };
+
+    return if initial_t == 0b11 {
+        if initial_n == 0 {
+            (0b11, 1)
+        } else {
+            (0b100, shift_n)
+        }
+    } else {
+        (initial_t, shift_n)
+    }
+}
+
 fn id_data_processing_shifted_register(word: u32, c: Context) -> ByteInstruction {
     // A5.3.11 // DONE
     assert!(matches(word, 25, 0b111_1111, 0b111_0101));
@@ -148,14 +167,8 @@ fn id_data_processing_shifted_register(word: u32, c: Context) -> ByteInstruction
     let default_data_comp = (default_data >> 4) & 0xFF;
     let default_data_alt = rd | rm << 4 | (setflags as u32) << 8;
 
-    let shift_t = (word >> 4) & 0b11;
-    let mut shift_n = (word >> 6) & 0b11 | (word & (0b111 << 12)) >> 10;
-    // A7.4.2 DecodeImmShift special handling for ASR and LSR
-    if shift_n == 0 && (shift_t == 0b01 || shift_t == 0b10) {
-        shift_n = 32;
-    }
-    let shift_n = shift_n;
-    let pro_extra = shift_t | shift_n << 2;
+    let (shift_t, shift_n) = decode_imm_shift((word >> 4) & 0b11, (word >> 6) & 0b11 | (word & (0b111 << 12)) >> 10);
+    let pro_extra = shift_t | shift_n << 3;
 
     let mut instr = match (word >> 21) & 0xF {
         0b0000 => {
@@ -187,10 +200,10 @@ fn id_data_processing_shifted_register(word: u32, c: Context) -> ByteInstruction
                 } else {
                     let opcode = match shift_t {
                         0b00 => Opcode::LslImm, // A7.7.68 T2
-                        0b01 => Opcode::LsrImm,
+                        0b01 => Opcode::LsrImm, // A7.7.70 T2
                         0b10 => Opcode::AsrImm, // A7.7.10 T2
-                        0b11 if shift_n == 0 => Opcode::Rrx, // A7.7.118 T1
-                        0b11 if shift_n != 0 => Opcode::RorImm, // A7.7.116 T1
+                        0b11 => Opcode::Rrx, // A7.7.118 T1
+                        0b100 => Opcode::RorImm, // A7.7.116 T1
                         _ => unreachable!(),
                     };
                     let mut base = tag::get_wide(opcode, c, rd | rm << 4 | (setflags as u32) << 8, shift_n);

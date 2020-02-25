@@ -51,15 +51,11 @@ pub fn rrx_c(input: u32, carry_in: u32) -> (u32, bool) {
     return (result, carry_out);
 }
 
-pub fn rrx(input: u32, carry_in: u32) -> u32 {
-    // p27
-    return rrx_c(input, carry_in).0;
-}
-
 pub fn lsl_c(input: u32, shift: u32) -> (u32, bool) {
     // p26
+    assert!(shift > 0);
     return match shift {
-        0..=31 => {
+        1..=31 => {
             let result = input << shift;
             let carry_out = bitset(input, 32 - shift);
             (result, carry_out)
@@ -71,8 +67,9 @@ pub fn lsl_c(input: u32, shift: u32) -> (u32, bool) {
 
 pub fn lsr_c(input: u32, shift: u32) -> (u32, bool) {
     // p26
+    assert!(shift > 0);
     return match shift {
-        0..=31 => {
+        1..=31 => {
             let result = input >> shift;
             let carry_out = bitset(input, shift - 1);
             (result, carry_out)
@@ -84,8 +81,9 @@ pub fn lsr_c(input: u32, shift: u32) -> (u32, bool) {
 
 pub fn asr_c(input: u32, shift: u32) -> (u32, bool) {
     // p27
+    assert!(shift > 0);
     return match shift {
-        0..=31 => {
+        1..=31 => {
             let result = ((input as i32) >> shift) as u32;
             let carry_out = bitset(input, shift - 1);
             (result, carry_out)
@@ -98,17 +96,18 @@ pub fn asr_c(input: u32, shift: u32) -> (u32, bool) {
     }
 }
 
+// Combination of DecodeImmShift and Shift_C. shift_n has already been adjusted for asr/lsr
 pub fn shift_c(input: u32, shift_t: u32, shift_n: u32, carry_in: u32) -> (u32, bool) {
     // A7.4.2
-    if shift_n == 0 {
+    if shift_n == 0 && shift_t != 0b11 {
         return (input, carry_in == 1);
     }
     return match shift_t {
         0b00 => lsl_c(input, shift_n),
         0b01 => lsr_c(input, shift_n),
         0b10 => asr_c(input, shift_n),
-        0b11 if shift_n == 0 => rrx_c(input, carry_in),
-        0b11 if shift_n != 0 => ror_c(input, shift_n),
+        0b11 => rrx_c(input, carry_in),
+        0b100 => ror_c(input, shift_n),
         _ => unreachable!(),
     }
 }

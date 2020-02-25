@@ -881,6 +881,38 @@ impl Board {
         return shift_c(reg_val, shift_t, shift_n, self.cpu.read_carry_flag() as u32);
     }
 
+    fn lsl_c(&self, reg_val: u32, shift_n: u32) -> (u32, bool) {
+        return if shift_n == 0 {
+            (reg_val, self.cpu.read_carry_flag())
+        } else {
+            bits::lsl_c(reg_val, shift_n)
+        }
+    }
+
+    fn lsr_c(&self, reg_val: u32, shift_n: u32) -> (u32, bool) {
+        return if shift_n == 0 {
+            (reg_val, self.cpu.read_carry_flag())
+        } else {
+            bits::lsr_c(reg_val, shift_n)
+        }
+    }
+
+    fn asr_c(&self, reg_val: u32, shift_n: u32) -> (u32, bool) {
+        return if shift_n == 0 {
+            (reg_val, self.cpu.read_carry_flag())
+        } else {
+            bits::asr_c(reg_val, shift_n)
+        }
+    }
+
+    fn ror_c(&self, reg_val: u32, shift_n: u32) -> (u32, bool) {
+        return if shift_n == 0 {
+            (reg_val, self.cpu.read_carry_flag())
+        } else {
+            bits::ror_c(reg_val, shift_n)
+        }
+    }
+
     fn add_with_carry_w_c(&self, reg_val: u32, imm32: u32) -> (u32, bool, bool) {
         return add_with_carry(reg_val, imm32, u32::from(self.cpu.read_carry_flag()));
     }
@@ -1022,8 +1054,8 @@ impl Board {
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 8) & 0xF;
         let setflags = bitset(data, 12);
-        let shift_t = extra & 0b11;
-        let shift_n = extra >> 2;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
         let (result, carry, overflow) = self.add_with_carry_w_c(self.read_reg(rn), shifted);
@@ -1079,8 +1111,8 @@ impl Board {
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 8) & 0xF;
         let setflags = bitset(data, 12);
-        let shift_t = extra & 0b11;
-        let shift_n = extra >> 2;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
         let (result, carry, overflow) = add_with_carry(self.read_reg(rn), shifted, 0);
@@ -1153,8 +1185,8 @@ impl Board {
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 8) & 0xF;
         let setflags = bitset(data, 12);
-        let shift_t = extra & 0b11;
-        let shift_n = extra >> 2;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
         let result = self.read_reg(rn) & shifted;
@@ -1170,7 +1202,7 @@ impl Board {
         let rm = (data >> 3) & 0x7;
         let shift_n = data >> 6;
 
-        let (result, carry) = bits::asr_c(self.read_reg(rm), shift_n);
+        let (result, carry) = self.asr_c(self.read_reg(rm), shift_n);
         self.write_reg(rd, result);
         if !self.in_it_block() {
             self.set_flags_nzc(result, carry);
@@ -1184,7 +1216,7 @@ impl Board {
         let setflags = bitset(data, 8);
         let shift_n = extra;
 
-        let (result, carry) = bits::asr_c(self.read_reg(rm), shift_n);
+        let (result, carry) = self.asr_c(self.read_reg(rm), shift_n);
         self.write_reg(rd, result);
         if setflags {
             self.set_flags_nzc(result, carry);
@@ -1197,7 +1229,7 @@ impl Board {
         let rm = data >> 3;
 
         let shift = self.read_reg(rm) & 0xFF;
-        let (result, carry) = bits::asr_c(self.read_reg(rdn), shift);
+        let (result, carry) = self.asr_c(self.read_reg(rdn), shift);
         if !self.in_it_block() {
             self.set_flags_nzc(result, carry);
         }
@@ -1211,7 +1243,7 @@ impl Board {
         let rm = extra;
 
         let shift_n = self.read_reg(rm) & 0xFF;
-        let (result, carry) = bits::asr_c(self.read_reg(rn), shift_n);
+        let (result, carry) = self.asr_c(self.read_reg(rn), shift_n);
         self.write_reg(rd, result);
         if setflags {
             self.set_flags_nzc(result, carry);
@@ -1308,8 +1340,8 @@ impl Board {
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 8) & 0xF;
         let setflags = bitset(data, 12);
-        let shift_t = extra & 0b11;
-        let shift_n = extra >> 2;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
         let result = self.read_reg(rn) & !shifted;
@@ -1400,8 +1432,8 @@ impl Board {
         // A7.7.26
         let rn = data & 0xF;
         let rm = data >> 4;
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
         let (result, carry, overflow) = add_with_carry(self.read_reg(rn), shifted, 0);
@@ -1435,8 +1467,8 @@ impl Board {
         // A7.7.28
         let rn = data & 0xF;
         let rm = data >> 4;
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
         let (result, carry, overflow) = add_with_carry(self.read_reg(rn), !shifted, 0);
@@ -1482,8 +1514,8 @@ impl Board {
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 8) & 0xF;
         let setflags = bitset(data, 12);
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_n = extra >> 3;
+        let shift_t = extra & 0b111;
 
         let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
         let result = self.read_reg(rn) ^ shifted;
@@ -1637,7 +1669,7 @@ impl Board {
         let rm = extra & 0xF;
         let shift_n = extra >> 4;
 
-        let (offset, _) = bits::lsl_c(self.read_reg(rm), shift_n);
+        let offset = self.read_reg(rm) << shift_n;
 
         // NOTE: Manual does not define `add`, `index`, or `wback` so we just assume it matches T1
         let address = self.read_reg(rn).wrapping_add(offset);
@@ -1728,7 +1760,8 @@ impl Board {
         let rd = data & 0x7;
         let rm = (data >> 3) & 0x7;
         let shift = data >> 6;
-        let (result, carry) = bits::lsl_c(self.read_reg(rm), shift);
+
+        let (result, carry) = self.lsl_c(self.read_reg(rm), shift);
         self.write_reg(rd, result);
         if !self.in_it_block() {
             self.set_flags_nzc(result, carry);
@@ -1742,7 +1775,7 @@ impl Board {
         let setflags = bitset(data, 8);
         let shift_n = extra;
 
-        let (result, carry) = bits::lsl_c(self.read_reg(rm), shift_n);
+        let (result, carry) = self.lsl_c(self.read_reg(rm), shift_n);
         self.write_reg(rd, result);
         if setflags {
             self.set_flags_nzc(result, carry);
@@ -1754,7 +1787,7 @@ impl Board {
         let rdn = data & 0x7;
         let rm = data >> 3;
         let shift = self.read_reg(rm) & 0xFF;
-        let (result, carry) = bits::lsl_c(self.read_reg(rdn), shift);
+        let (result, carry) = self.lsl_c(self.read_reg(rdn), shift);
         self.write_reg(rdn, result);
         if !self.in_it_block() {
             self.set_flags_nzc(result, carry);
@@ -1769,7 +1802,7 @@ impl Board {
         let rm = extra;
 
         let shift_n = self.read_reg(rm) & 0xFF;
-        let (result, carry) = bits::lsl_c(self.read_reg(rn), shift_n);
+        let (result, carry) = self.lsl_c(self.read_reg(rn), shift_n);
         self.write_reg(rd, result);
         if setflags {
             self.set_flags_nzc(result, carry);
@@ -1781,7 +1814,8 @@ impl Board {
         let rd = data & 0x7;
         let rm = (data >> 3) & 0x7;
         let shift = data >> 6;
-        let (result, carry) = bits::lsr_c(self.read_reg(rm), shift);
+
+        let (result, carry) = self.lsr_c(self.read_reg(rm), shift);
         self.write_reg(rd, result);
         if !self.in_it_block() {
             self.set_flags_nzc(result, carry);
@@ -1795,7 +1829,7 @@ impl Board {
         let setflags = bitset(data, 8);
         let shift_n = extra;
 
-        let (result, carry) = bits::lsr_c(self.read_reg(rm), shift_n);
+        let (result, carry) = self.lsr_c(self.read_reg(rm), shift_n);
         self.write_reg(rd, result);
         if setflags {
             self.set_flags_nzc(result, carry);
@@ -1806,8 +1840,9 @@ impl Board {
         // A7.7.71
         let rdn = data & 0x7;
         let rm = data >> 3;
+
         let shift = self.read_reg(rm) & 0xFF;
-        let (result, carry) = bits::lsr_c(self.read_reg(rdn), shift);
+        let (result, carry) = self.lsr_c(self.read_reg(rdn), shift);
         self.write_reg(rdn, result);
         if !self.in_it_block() {
             self.set_flags_nzc(result, carry);
@@ -1822,7 +1857,7 @@ impl Board {
         let rm = extra;
 
         let shift_n = self.read_reg(rm) & 0xFF;
-        let (result, carry) = bits::lsr_c(self.read_reg(rn), shift_n);
+        let (result, carry) = self.lsr_c(self.read_reg(rn), shift_n);
         self.write_reg(rd, result);
         if setflags {
             self.set_flags_nzc(result, carry);
@@ -1972,8 +2007,8 @@ impl Board {
         let rd = data & 0xF;
         let rm = (data >> 4) & 0xF;
         let setflags = bitset(data, 8);
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
         let result = !shifted;
@@ -2010,8 +2045,8 @@ impl Board {
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 4) & 0xF;
         let setflags = bitset(data, 12);
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_n = extra >> 3;
+        let shift_t = extra & 0b111;
 
         let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
         let result = self.read_reg(rn) | !shifted;
@@ -2052,8 +2087,8 @@ impl Board {
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 4) & 0xF;
         let setflags = bitset(data, 12);
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
         let result = self.read_reg(rn) | shifted;
@@ -2068,8 +2103,8 @@ impl Board {
         let rd = data & 0xF;
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 8) & 0xF;
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_n = extra >> 3;
+        let shift_t = extra & 0b111;
         let tbform = bitset(extra, 1);
 
         let rn_val = self.read_reg(rn);
@@ -2270,7 +2305,7 @@ impl Board {
         let setflags = bitset(data, 8);
         let shift_n = extra;
 
-        let (result, carry) = bits::ror_c(self.read_reg(rm), shift_n);
+        let (result, carry) = self.ror_c(self.read_reg(rm), shift_n);
         self.write_reg(rd, result);
         if setflags {
             self.set_flags_nzc(result, carry);
@@ -2283,7 +2318,7 @@ impl Board {
         let rm = data >> 3;
 
         let shift = self.read_reg(rm) & 0xFF;
-        let (result, carry) = bits::ror_c(self.read_reg(rdn), shift);
+        let (result, carry) = self.ror_c(self.read_reg(rdn), shift);
         self.write_reg(rdn, result);
         if !self.in_it_block() {
             self.set_flags_nzc(result, carry);
@@ -2298,7 +2333,7 @@ impl Board {
         let rm = extra;
 
         let shift_n = self.read_reg(rm) & 0xFF;
-        let (result, carry) = bits::ror_c(self.read_reg(rn), shift_n);
+        let (result, carry) = self.ror_c(self.read_reg(rn), shift_n);
         self.write_reg(rd, result);
         if setflags {
             self.set_flags_nzc(result, carry);
@@ -2346,8 +2381,8 @@ impl Board {
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 8) & 0xF;
         let setflags = bitset(data, 12);
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
         let (result, carry, overflow) = add_with_carry(!self.read_reg(rn), shifted, 1);
@@ -2388,8 +2423,8 @@ impl Board {
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 8) & 0xF;
         let setflags = bitset(data, 12);
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_n = extra >> 3;
+        let shift_t = extra & 0b111;
 
         let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
         let (result, carry, overflow) = self.add_with_carry_w_c(self.read_reg(rn), !shifted);
@@ -2538,7 +2573,8 @@ impl Board {
         let rn = data >> 4;
         let rm = extra & 0xF;
         let imm2 = extra >> 4;
-        let (offset, _) = bits::lsl_c(self.read_reg(rm), imm2);
+
+        let offset = self.read_reg(rm) << imm2;
         let address = self.read_reg(rn).wrapping_add(offset);
         self.write_mem_u(address, 4, self.read_reg(rt));
     }
@@ -2705,8 +2741,8 @@ impl Board {
         // A7.7.187
         let rn = data & 0xF;
         let rm = data >> 4;
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
         let result = self.read_reg(rn) ^ shifted;
@@ -2734,8 +2770,8 @@ impl Board {
         // A7.7.189
         let rn = data & 0xF;
         let rm = data >> 4;
-        let shift_n = extra >> 2;
-        let shift_t = extra & 0b11;
+        let shift_n = extra >> 3;
+        let shift_t = extra & 0b111;
 
         let (shifted, carry) = self.get_shift_with_carry(self.read_reg(rm), shift_t, shift_n);
         let result = self.read_reg(rn) & shifted;
