@@ -229,7 +229,7 @@ pub struct CPU {
 impl CPU {
     pub fn new() -> CPU {
         return CPU {
-            registers: [0xABCDABCD; 16],
+            registers: [0x0000_0000; 16],
             instr_pc: 0,
             sp_unpredictable: false, // TODO: Ensure this value is maintained
             sp_main: 0,
