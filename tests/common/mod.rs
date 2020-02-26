@@ -1,8 +1,13 @@
+#[allow(dead_code)]
+
+use std::process::ExitStatus;
 use disco_emulator::Board;
 
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use std::process::{Command, Child};
 
-use std::process::Command;
+pub mod online;
 
 fn get_tests_path() -> Result<PathBuf, String> {
     let exec_path = match std::env::args().nth(0) {
@@ -23,11 +28,12 @@ fn get_tests_path() -> Result<PathBuf, String> {
     return Ok(path);
 }
 
-fn compile_program(src_path: &Path, linker_path: &Path) -> Result<PathBuf, String> {
+pub fn compile_program(src_path: &Path, linker_path: &Path) -> Result<PathBuf, String> {
     let mut elf_path = PathBuf::from(&src_path);
     elf_path.push("firmware.elf");
 
     let mut asm_child = Command::new("arm-none-eabi-as")
+                                .arg("-g")
                                 .arg("-mthumb")
                                 .arg("-mcpu=cortex-m4")
                                 .arg("-o")
@@ -57,6 +63,14 @@ fn compile_program(src_path: &Path, linker_path: &Path) -> Result<PathBuf, Strin
         return Err("failed to link source".to_string());
     }
     return Ok(elf_path);
+}
+
+pub fn get_default_linker() -> Result<PathBuf, String> {
+    let mut path = get_tests_path()?;
+    path.push("fixtures");
+    path.push("common");
+    path.push("linker.ld");
+    return Ok(path);
 }
 
 pub fn load_program(name: &str) -> Result<Board, String> {
@@ -117,4 +131,85 @@ pub fn load_and_wait(name: &str, wait_reg: u32, wait_signal: u32) -> Result<Boar
     }
 
     return Ok(board);
+}
+
+fn get_openocd_config_path() -> Result<PathBuf, String> {
+    let mut tests = get_tests_path()?;
+    tests.push("fixtures");
+    tests.push("common");
+    tests.push("board_config.cfg");
+    return Ok(tests);
+}
+
+pub fn get_online_src_path(folder: &str) -> Result<PathBuf, String> {
+    let mut tests = get_tests_path()?;
+    tests.push("fixtures");
+    tests.push("online");
+    tests.push(folder);
+    return Ok(tests);
+}
+
+pub fn spawn_openocd_server(port: usize) -> Result<Child, String> {
+    let mut openocd = Command::new("openocd")
+                        .arg("-f")
+                        .arg(get_openocd_config_path()?)
+                        .arg("-c")
+                        .arg(format!("gdb_port {}", port))
+                        .stdin(std::process::Stdio::piped())
+                        .stdout(std::process::Stdio::piped())
+                        .stderr(std::process::Stdio::piped())
+                        .spawn().expect("failed to spawn openocd; is it on your PATH?");
+
+    let mut child_err = BufReader::new(openocd.stderr.as_mut().unwrap());
+    let mut line = String::new();
+    for _ in 0..30 {
+        line.clear();
+        child_err.read_line(&mut line).unwrap();
+        println!("> {}", line);
+
+        if line == format!("Info : Listening on port {} for gdb connections\n", port) {
+            return Ok(openocd);
+        }
+    }
+
+    openocd.kill().unwrap();
+    return Err("failed to spawn openocd properly".to_string());
+}
+
+pub fn upload_via_openocd(elf_path: &Path) -> Result<ExitStatus, String> {
+    return Ok(Command::new("openocd")
+                        .arg("-f")
+                        .arg(get_openocd_config_path()?)
+                        .arg("-c")
+                        .arg(format!("program {} verify reset exit", elf_path.to_str().unwrap()))
+                        .stdin(std::process::Stdio::piped())
+                        .stdout(std::process::Stdio::piped())
+                        .stderr(std::process::Stdio::piped())
+                        .spawn().expect("failed to spawn openocd; is it on your PATH?")
+                        .wait().unwrap());
+}
+
+pub fn spawn_gdb(elf_path: &Path, port: usize) -> Result<Child, String> {
+    let mut gdb = Command::new("arm-none-eabi-gdb")
+                        .arg("--nx")
+                        .arg("--quiet")
+                        .arg("--interpreter=mi2")
+                        .arg(elf_path)
+                        .stdin(std::process::Stdio::piped())
+                        .stdout(std::process::Stdio::piped())
+                        .stderr(std::process::Stdio::piped())
+                        .spawn().expect("failed to spawn arm-none-eabi-gdb; is it on your PATH?");
+
+    let gdb_stdin = gdb.stdin.as_mut().unwrap();
+    gdb_stdin.write(format!("-target-select extended-remote localhost:{}\n", port).as_bytes()).unwrap();
+
+    let mut child_err = BufReader::new(gdb.stdout.as_mut().unwrap());
+    let mut line = String::new();
+    for _ in 0..5 {
+        line.clear();
+        child_err.read_line(&mut line).unwrap();
+        println!(">> {}", line);
+    }
+
+    return Ok(gdb);
 }

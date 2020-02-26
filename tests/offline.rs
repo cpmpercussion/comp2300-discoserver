@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+
 mod common;
 use common::{load_program, load_and_step, load_and_wait};
 
