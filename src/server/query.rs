@@ -1,5 +1,3 @@
-use std::vec;
-
 #[derive(Debug)]
 pub enum Query {
     CurrentThread,

@@ -1,4 +1,3 @@
-use std::vec::Vec;
 use std::str;
 
 pub fn hex_to_word(hex: &[u8]) -> Result<u32, ()> {

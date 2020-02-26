@@ -79,8 +79,8 @@ enum Request {
     EditBreakpoint { address: u32, set: bool, btype: BreakpointType, kind: BreakpointKind },
 }
 
-pub struct GdbServer {
-    stream: TcpStream,
+pub struct GdbServer<'a> {
+    stream: & 'a mut TcpStream,
     tcp_buffer: Box<[u8]>,
     packet_builder: Vec<u8>,
     packet_builder_state: PacketState,
@@ -91,8 +91,8 @@ pub struct GdbServer {
     hw_breakpoints: HashSet<u32>,
 }
 
-impl GdbServer {
-    fn new(stream: TcpStream, buffer_size: usize) -> GdbServer {
+impl GdbServer<'_> {
+    fn new(stream: &mut TcpStream, buffer_size: usize) -> GdbServer {
         return GdbServer {
             stream: stream,
             tcp_buffer: vec![0; buffer_size].into_boxed_slice(),
@@ -112,28 +112,31 @@ impl GdbServer {
         let listener = match TcpListener::bind(format!("127.0.0.1:{}", port)) {
             Ok(s) => s,
             Err(e) => {
-                println!("errr");
+                println!("error connecting to port {}: {:?}", port, e);
                 return;
             }
         };
 
         match listener.accept() {
-            Ok((socket, addr)) => {
+            Ok((socket, _addr)) => {
                 println!("connected");
                 GdbServer::handle_client(socket);
             }
             Err(e) => {
+                println!("error accepting connection: {:?}", e);
                 return;
             }
         }
     }
 
-    fn handle_client(stream: TcpStream) {
-        let mut server = GdbServer::new(stream, 4096);
+    fn handle_client(mut stream: TcpStream) {
+        let mut server = GdbServer::new(&mut stream, 4096);
 
         if let Err(e) = server.run(get_audio_from_argv()) {
             println!("server error: {:?}", e);
         };
+
+        stream.shutdown(Shutdown::Both).expect("shutdown call failed");
     }
 
     fn run(&mut self, audio: bool) -> Result<(), ()> {
@@ -264,7 +267,7 @@ impl GdbServer {
                     }
                     self.send_reply(strs.as_slice());
                 }
-                Request::WriteMemory { address, length, bytes } => {
+                Request::WriteMemory { address: _, length: _, bytes: _ } => {
                     self.send_reply_empty();
                 }
                 Request::Query { query } => {
@@ -371,7 +374,7 @@ impl GdbServer {
         let (packet, acknowledge) = match self.receive_packet() {
             Ok(r) => r,
             Err(e) => {
-                println!("failed to receive packet");
+                println!("failed to receive packet: {:?}", e);
                 return Err(());
             }
         };
@@ -427,7 +430,7 @@ impl GdbServer {
         };
     }
 
-    fn parse_continue(&mut self, packet: &[u8]) -> Result<Request, ()> {
+    fn parse_continue(&mut self, _packet: &[u8]) -> Result<Request, ()> {
         // TODO: Support reading optional params
         return Ok(Request::Continue {
             address: None,
@@ -435,7 +438,7 @@ impl GdbServer {
         });
     }
 
-    fn parse_step(&mut self, packet: &[u8]) -> Result<Request, ()> {
+    fn parse_step(&mut self, _packet: &[u8]) -> Result<Request, ()> {
         // TODO: Support reading optional params
         return Ok(Request::SingleStep {
             address: None,
@@ -443,7 +446,7 @@ impl GdbServer {
         });
     }
 
-    fn parse_write_registers(&mut self, packet: &[u8]) -> Result<Request, ()> {
+    fn parse_write_registers(&mut self, _packet: &[u8]) -> Result<Request, ()> {
         return Err(());
     }
 
@@ -503,7 +506,7 @@ impl GdbServer {
         }
     }
 
-    fn parse_write_address(&mut self, packet: &[u8]) -> Result<Request, ()> {
+    fn parse_write_address(&mut self, _packet: &[u8]) -> Result<Request, ()> {
         return Ok(Request::WriteMemory {
             address: 0,
             length: 0,
@@ -641,7 +644,7 @@ impl GdbServer {
             // No packets means we don't have enough data for a full one.
             // The only way to get more is reading the stream
             if let Err(e) = self.process_tcp_packet() {
-                println!("failed to read packet");
+                println!("failed to read packet: {:?}", e);
                 return Err(());
             };
         }
