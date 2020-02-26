@@ -369,6 +369,7 @@ impl Board {
     fn try_goto_default_handler(&mut self) -> Result<(), String> {
         return match self.get_default_handler() {
             Ok(h) => {
+                self.exclusive_monitors_clear();
                 self.pending_default_handler.set(false);
                 self.branch_write_pc(h);
                 Ok(())
