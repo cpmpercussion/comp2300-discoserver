@@ -182,9 +182,9 @@ pub fn upload_via_openocd(elf_path: &Path) -> Result<ExitStatus, String> {
                         .arg(get_openocd_config_path()?)
                         .arg("-c")
                         .arg(format!("program {} verify reset exit", elf_path.to_str().unwrap()))
-                        .stdin(std::process::Stdio::piped())
-                        .stdout(std::process::Stdio::piped())
-                        .stderr(std::process::Stdio::piped())
+                        // .stdin(std::process::Stdio::piped())
+                        // .stdout(std::process::Stdio::piped())
+                        // .stderr(std::process::Stdio::piped())
                         .spawn().expect("failed to spawn openocd; is it on your PATH?")
                         .wait().unwrap());
 }
@@ -201,7 +201,7 @@ pub fn spawn_gdb(elf_path: &Path, port: usize) -> Result<Child, String> {
                         .spawn().expect("failed to spawn arm-none-eabi-gdb; is it on your PATH?");
 
     let gdb_stdin = gdb.stdin.as_mut().unwrap();
-    gdb_stdin.write(format!("-target-select extended-remote localhost:{}\n", port).as_bytes()).unwrap();
+    gdb_stdin.write(format!("-target-select remote localhost:{}\n", port).as_bytes()).unwrap();
 
     let mut child_err = BufReader::new(gdb.stdout.as_mut().unwrap());
     let mut line = String::new();

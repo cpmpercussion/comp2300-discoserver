@@ -1,13 +1,11 @@
 #[allow(dead_code)]
 
-use crate::common::upload_via_openocd;
 use disco_emulator::Board;
 use std::path::Path;
-use crate::common::spawn_gdb;
-use crate::common::spawn_openocd_server;
 use std::process::{Child};
 use std::io::{BufRead, BufReader, Write};
 
+use crate::common::{spawn_gdb, spawn_openocd_server};
 
 pub struct Online {
     gdb: Child,
@@ -16,17 +14,24 @@ pub struct Online {
 
 impl Online {
     pub fn new(elf_path: &Path, port: usize) -> Online {
-        // if !upload_via_openocd(elf_path).unwrap().success() {
-        //     panic!("Failed to upload to board");
-        // };
-
         let openocd = spawn_openocd_server(port).unwrap();
         let gdb = spawn_gdb(&elf_path, port).unwrap();
 
-        return Online {
+        let mut online = Online {
             openocd,
             gdb,
         };
+
+        // upload_via_openocd(&elf_path).unwrap();
+
+        println!("reseting monitor");
+        online.exec_gdb("interpreter console \"monitor reset halt\"");
+        println!("reset monitor");
+
+        online.exec_gdb("-target-download");
+        online.read_until("^done").unwrap();
+
+        return online;
     }
 
     pub fn exec_gdb(&mut self, command: &str) {
@@ -44,7 +49,7 @@ impl Online {
     pub fn read_until(&mut self, start: &str) -> Result<String, String> {
         for _ in 0..15 {
             let line =  self.read_gdb_line();
-            println!(">> {}", line);
+            println!(">>> {}", line);
             if line.starts_with(start) {
                 return Ok(line);
             } else if line.starts_with("^error") {
@@ -55,12 +60,32 @@ impl Online {
     }
 
     pub fn step(&mut self) {
-        self.exec_gdb("-exec-step-instruction");
-        self.read_until("^running").unwrap();
+        self.exec_gdb("-exec-step-instruction 1");
+        self.read_until("*stopped").unwrap();
     }
 
     pub fn get_registers(&mut self) -> [u32; 16] {
-        return [0u32; 16];
+        self.exec_gdb("-data-list-register-values x [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]");
+        let response = self.read_until("^done").unwrap();
+
+        if !response.starts_with("^done,register-values=") {
+            panic!("unexpected registers response");
+        }
+
+        let values = &response[24..response.len() - 3];
+
+        let mut split = values.split("},{");
+        let mut values = [0u32; 16];
+
+
+        for i in 0..=15 {
+            let reg_str = split.next().unwrap();
+            let val_str = &reg_str[format!("number=\"{}\",value=\"0x", i).len().. reg_str.len() - 1];
+            let val = u32::from_str_radix(val_str, 16).unwrap();
+            values[i] = val;
+        }
+
+        return values;
     }
 
     pub fn verify_state(&mut self, board: &Board) -> Result<(), String> {
@@ -68,12 +93,12 @@ impl Online {
 
         for i in 0..=14u32 {
             if board.read_reg(i) != registers[i as usize] {
-                return Err(format!("Register {} not matching: real={:08X}, emulator={:08X}", i, registers[i as usize], board.read_reg(i)));
+                return Err(format!("Register {} not matching: real=0x{:08X}, emulator=0x{:08X}", i, registers[i as usize], board.read_reg(i)));
             }
         }
 
         if board.cpu.read_instruction_pc() != registers[15] {
-            return Err(format!("PC not matching: real={:08X}, emulator={:08X}", registers[15], board.cpu.read_instruction_pc()));
+            return Err(format!("PC not matching: real=0x{:08X}, emulator=0x{:08X}", registers[15], board.cpu.read_instruction_pc()));
         }
 
         return Ok(());
@@ -84,17 +109,22 @@ impl Online {
 
         println!("waiting for gdb to exit...");
         self.gdb.wait().unwrap();
-        println!("done");
-    }
-}
 
-impl Drop for Online {
-    fn drop(&mut self) {
-        if let Err(e) = self.gdb.kill() {
-            eprintln!("Failed to kill gdb: {}", e);
-        }
         if let Err(e) = self.openocd.kill() {
             eprintln!("Failed to kill openocd: {}", e);
         }
+
+        println!("done");
     }
 }
+//
+// impl Drop for Online {
+//     fn drop(&mut self) {
+//         if let Err(e) = self.gdb.kill() {
+//             eprintln!("Failed to kill gdb: {}", e);
+//         }
+//         if let Err(e) = self.openocd.kill() {
+//             eprintln!("Failed to kill openocd: {}", e);
+//         }
+//     }
+// }
