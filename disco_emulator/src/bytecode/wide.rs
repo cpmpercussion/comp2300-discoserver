@@ -661,8 +661,13 @@ fn id_data_proc_plain_binary_immediate(word: u32, c: Context) -> ByteInstruction
     let rd = (word >> 8) & 0xF;
     let rn = (word >> 16) & 0xF;
 
-    let imm12 = word & 0xFF | (word & (0x7 << 12)) >> 4 | (word & (1 << 25)) >> 14;
-    let imm5 = (word & (0x7 << 12)) >> 10 | (word & (0x3 << 6)) >> 6;
+    let imm8 = word & 0xFF;
+    let imm3 = (word >> 12) & 0x7;
+    let imm2 = (word >> 6) & 0x3;
+    let i = (word >> 26) & 0x1;
+
+    let imm12 = imm8 | imm3 << 8 | i << 11;
+    let imm5 = imm2 | imm3 << 2;
     let sat_imm5 = word & 0x1F;
     let shift_n = imm5;
 
