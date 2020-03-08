@@ -201,6 +201,10 @@ fn mov() {
     board.step().unwrap();
     assert_eq!(board.read_reg(10u32), 65535);
 
+    // MOV (imm) T3
+    board.step().unwrap();
+    assert_eq!(board.read_reg(0u32), 0x1234);
+
     // MOV (reg) T1
     board.step_n(2).unwrap();
     assert_eq!(board.read_reg(8u32), 0xFF);

@@ -21,6 +21,9 @@ main:
   @ MOV (imm) T3
   mov.W r10, 65535
 
+  @ MOV (imm) T3 (regression)
+  mov.W r0, 0x1234
+
   @ MOV (reg) T1
   mov r8, 0xFF
   mov.N r9, r8
