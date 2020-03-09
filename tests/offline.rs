@@ -122,6 +122,35 @@ fn add() {
 }
 
 #[test]
+fn and() {
+    let mut board = load_and_step("and", 3).unwrap();
+
+    // AND (imm) T1
+    board.step_n(2).unwrap();
+    assert_eq!(board.read_reg(9u32), 0x0000_0000);
+    assert_eq!(board.read_reg(10u32), 0xF000_F000);
+
+    // AND (reg) T1
+    board.step_n(1).unwrap();
+    assert_eq!(board.read_reg(1u32), 0xF0F0_F0F0);
+
+    // AND (reg) T2
+    board.step_n(2).unwrap();
+    assert_eq!(board.read_reg(5u32), 0x0000_0000);
+
+    board.step_n(10).unwrap();
+    assert_eq!(board.read_reg(6u32), 0xFFFF_FFF0);
+    assert_eq!(board.read_reg(7u32), 0x0000_FFFF);
+    assert_eq!(board.read_reg(8u32), 0x0000_0000);
+    assert_eq!(board.read_reg(9u32), 0xFFFF_FFFF);
+
+    board.step_n(11).unwrap();
+    assert_eq!(board.read_reg(5u32), 0x0F0F_0F0F);
+    assert_eq!(board.read_reg(6u32), 0xF878_7878);
+    assert_eq!(board.read_reg(7u32), 0x7878_7878);
+}
+
+#[test]
 fn sub() {
     let mut board = load_program("sub").unwrap();
 

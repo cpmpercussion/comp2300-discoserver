@@ -167,7 +167,11 @@ fn id_data_processing_shifted_register(word: u32, c: Context) -> ByteInstruction
     let default_data_comp = (default_data >> 4) & 0xFF;
     let default_data_alt = rd | rm << 4 | (setflags as u32) << 8;
 
-    let (shift_t, shift_n) = decode_imm_shift((word >> 4) & 0b11, (word >> 6) & 0b11 | (word & (0b111 << 12)) >> 10);
+    let type_ = (word >> 4) & 0x3;
+    let imm2 = (word >> 6) & 0x3;
+    let imm3 = (word >> 12) & 0x7;
+
+    let (shift_t, shift_n) = decode_imm_shift(type_, imm2 | imm3 << 2);
     let pro_extra = shift_t | shift_n << 3;
 
     let mut instr = match (word >> 21) & 0xF {
