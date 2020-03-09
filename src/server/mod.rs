@@ -153,7 +153,14 @@ impl GdbServer<'_> {
         }
 
         if audio {
-            self.board.spawn_audio();
+            match get_buffer_from_argv() {
+                Some(b) => {
+                    self.board.spawn_buffered_audio(b * 1000);
+                },
+                None => {
+                    self.board.spawn_audio();
+                }
+            }
         }
 
         loop {
@@ -788,6 +795,24 @@ fn get_debug_from_argv() -> bool {
         }
     }
     return false;
+}
+
+// Gets the audio buffer amount in seconds
+fn get_buffer_from_argv() -> Option<u32> {
+    let mut args = env::args();
+    while let Some(arg) = args.next() {
+        if arg == "--buffer" {
+            let amount = args.next()?;
+            return Some(match amount.parse::<u32>() {
+                Ok(v) => v,
+                Err(e) => {
+                    println!("Failed to read audio buffer amount: {}", e);
+                    return None;
+                }
+            });
+        }
+    }
+    return None;
 }
 
 fn parse_read_memory(mut data: &[u8]) -> Result<(u32, u32), ()> {

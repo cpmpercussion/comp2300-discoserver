@@ -356,6 +356,10 @@ impl Board {
         self.audio_handler.spawn_audio();
     }
 
+    pub fn spawn_buffered_audio(&mut self, buffer_ms_size: u32) {
+        self.audio_handler.spawn_buffered_audio(buffer_ms_size);
+    }
+
     fn get_default_handler(&self) -> Result<u32, String> {
         // TODO: Goto fault handler (but account for when it doesn't goto valid location)
         if let Ok(hard_fault_addr) = self.memory.read_mem_u(3 * 4, 4) {

@@ -99,6 +99,90 @@ impl AudioHandler {
             println!("Could not connect to suitable audio output");
         }
     }
+
+    pub fn spawn_buffered_audio(&mut self, buffer_ms: u32) {
+        let target_freq = 48_000;
+        let target_buffer_fill = (buffer_ms * target_freq / 1000) as usize;
+        let (tx_data, rx_data) = sync_channel::<i16>(32); // board uses ~6
+        let (tx_confirm, rx_confirm) = sync_channel::<bool>(1);
+
+        thread::spawn(move || {
+            let host = cpal::default_host();
+            let event_loop = host.event_loop();
+            let (stream_id, num_channels) = match get_audio_config(target_freq, &host, &event_loop) {
+                Ok(result) => {
+                    println!("Spawned audio at freq {}", target_freq);
+                    tx_confirm.send(true).unwrap();
+                    result
+                },
+                Err(e) => {
+                    println!("Failed to spawn audio: {}", e);
+                    tx_confirm.send(false).unwrap();
+                    return;
+                }
+            };
+
+            let rx_data = Mutex::new(rx_data);
+            let mut audio_buffer: Vec<i16> = Vec::new();
+
+            event_loop.play_stream(stream_id.clone()).unwrap();
+
+            event_loop.run(move |id, result| {
+                let data = match result {
+                    Ok(data) => data,
+                    Err(err) => {
+                        eprintln!("an error occurred on stream {:?}: {}", id, err);
+                        return;
+                    }
+                };
+
+                let rx_data = rx_data.lock().unwrap();
+
+                if audio_buffer.len() < 100 {
+                    while audio_buffer.len() < target_buffer_fill {
+                        audio_buffer.push(rx_data.recv().unwrap());
+                    }
+                }
+
+                match data {
+                    cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::I16(mut buffer) } => {
+                        for sample in buffer.chunks_mut(num_channels) {
+                            let value = rx_data.recv().unwrap();
+                            for out in sample.iter_mut() {
+                                *out = value;
+                            }
+                        }
+                    },
+                    cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::U16(mut buffer) } => {
+                        for sample in buffer.chunks_mut(num_channels) {
+                            let value = map_to_unsigned(rx_data.recv().unwrap());
+                            for out in sample.iter_mut() {
+                                *out = value;
+                            }
+                        }
+                    },
+                    cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::F32(mut buffer) } => {
+                        for sample in buffer.chunks_mut(num_channels) {
+                            let value = map_to_float(rx_data.recv().unwrap());
+                            for out in sample.iter_mut() {
+                                *out = value;
+                            }
+                        }
+                    },
+                    _ => {
+                        panic!("unrecognised stream data kind");
+                    }
+                }
+            });
+        });
+
+        if rx_confirm.recv().unwrap() {
+            println!("Buffered audio output ({}s) connected", buffer_ms / 1000);
+            self.sender = Some(tx_data);
+        } else {
+            println!("Could not connect to suitable audio output");
+        }
+    }
 }
 
 fn get_audio_config(freq: u32, host: &cpal::Host, event_loop: &cpal::EventLoop) -> Result<(cpal::StreamId, usize), String> {
