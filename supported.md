@@ -1,7 +1,34 @@
-### Misc
+# Disco Emulator
+
+### General
 Peripherals and interrupts are not supported. Audio specifically is supported, by detecting the call to `BSP_AUDIO_OUT_Play_Sample`.
 
-### Instructions
+### Arguments
+See the generated `platformio.ini` file for where to add arguments (in the `debug_server` property).
+
+- To check the emulator version, pass `--version`
+- If you want sound to work, pass `--audio`. Verify by checking the `DEBUG CONSOLE` output for audio related messages. A working audio connection looks something like this
+    ```
+    Candidate audio format: channels: 1, min: SampleRate(1), max: SampleRate(192000), data: I16
+    Spawned audio at freq 48000
+    Audio output connected
+    ```
+
+    CAUTION: Turn down your volume initially, and raise it to the desired level. The output can be very loud.
+- To buffer the audio output, pass `--buffer` and then the number of seconds to buffer for on the next line. E.g.,
+    ```
+    --buffer
+    5
+    ```
+    for a 5 second buffer (it will gather 5 seconds worth of samples and then play them, then gather the next 5 seconds and play, and so on).
+    
+    Try without a buffer first, and only use it if the sound is glitchy (actions such as moving your mouse should make the sound even worse if this is the case).
+
+    Check the debug console for when the buffer is being filled and emptied. You may see `underrun` errors; these can be ignored. The debugger cannot be paused while the buffer is being emptied (i.e., sound is being played).
+- A private Piazza post is the preferred way to report any issues. If something is going wrong, please use the `--debug` flag and include the output in `DEBUG CONSOLE` with the report.
+
+
+### Supported Instructions
 
 The following table shows the expected support of the current emulator. If a box is ticked, then all encodings of that instruction are expected to work as intended. If crossed, then either all or some of the encodings will not execute properly.
 
