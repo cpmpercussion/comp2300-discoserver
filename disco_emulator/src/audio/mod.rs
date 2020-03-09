@@ -121,9 +121,9 @@ impl AudioHandler {
                     return;
                 }
             };
-
             let rx_data = Mutex::new(rx_data);
-            let mut audio_buffer: Vec<i16> = Vec::new();
+            use std::collections::VecDeque;
+            let mut audio_buffer: VecDeque<i16> = VecDeque::new();
 
             event_loop.play_stream(stream_id.clone()).unwrap();
 
@@ -138,16 +138,16 @@ impl AudioHandler {
 
                 let rx_data = rx_data.lock().unwrap();
 
-                if audio_buffer.len() < 100 {
+                if audio_buffer.len() < 1000 {
                     while audio_buffer.len() < target_buffer_fill {
-                        audio_buffer.push(rx_data.recv().unwrap());
+                        audio_buffer.push_back(rx_data.recv().unwrap());
                     }
                 }
 
                 match data {
                     cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::I16(mut buffer) } => {
                         for sample in buffer.chunks_mut(num_channels) {
-                            let value = rx_data.recv().unwrap();
+                            let value = audio_buffer.pop_front().unwrap();
                             for out in sample.iter_mut() {
                                 *out = value;
                             }
@@ -155,7 +155,7 @@ impl AudioHandler {
                     },
                     cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::U16(mut buffer) } => {
                         for sample in buffer.chunks_mut(num_channels) {
-                            let value = map_to_unsigned(rx_data.recv().unwrap());
+                            let value = map_to_unsigned(audio_buffer.pop_front().unwrap());
                             for out in sample.iter_mut() {
                                 *out = value;
                             }
@@ -163,7 +163,7 @@ impl AudioHandler {
                     },
                     cpal::StreamData::Output { buffer: cpal::UnknownTypeOutputBuffer::F32(mut buffer) } => {
                         for sample in buffer.chunks_mut(num_channels) {
-                            let value = map_to_float(rx_data.recv().unwrap());
+                            let value = map_to_float(audio_buffer.pop_front().unwrap());
                             for out in sample.iter_mut() {
                                 *out = value;
                             }
