@@ -155,7 +155,12 @@ impl GdbServer<'_> {
         if audio {
             match get_buffer_from_argv() {
                 Some(b) => {
-                    self.board.spawn_buffered_audio(b * 1000);
+                    if b == 0 {
+                        println!("Cannot buffer audio for 0 seconds; not using buffer");
+                        self.board.spawn_audio();
+                    } else {
+                        self.board.spawn_buffered_audio(b * 1000);
+                    }
                 },
                 None => {
                     self.board.spawn_audio();
