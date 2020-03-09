@@ -139,9 +139,11 @@ impl AudioHandler {
                 let rx_data = rx_data.lock().unwrap();
 
                 if audio_buffer.len() < 1000 {
+                    println!("Filling audio buffer...");
                     while audio_buffer.len() < target_buffer_fill {
                         audio_buffer.push_back(rx_data.recv().unwrap());
                     }
+                    println!("Refilled audio buffer");
                 }
 
                 match data {
