@@ -1245,7 +1245,7 @@ impl Board {
                 if name == "BSP_AUDIO_OUT_Play_Sample" || name == "audio_play_sample" {
                     self.audio_handler.handle((self.read_reg(0u32) & 0xFFFF) as i16);
                 } else {
-                    println!("Skipping branch to {}", name);
+                    println!("Skipping call to {}", name);
                 }
             }
             None => {
@@ -1800,7 +1800,6 @@ impl Board {
 
         let result = self.read_reg(rm);
         if rd == 15 {
-            println!("alu writing pc {}", result);
             self.alu_write_pc(result);
         } else {
             self.write_reg(rd, result);

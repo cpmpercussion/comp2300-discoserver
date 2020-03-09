@@ -4,6 +4,6 @@ mod server;
 use server::GdbServer;
 
 fn main() {
-    println!("started program");
+    println!("started emulator server");
     GdbServer::start_server();
 }

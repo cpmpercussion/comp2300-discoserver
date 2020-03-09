@@ -36,7 +36,7 @@ impl AudioHandler {
             let event_loop = host.event_loop();
             let (stream_id, num_channels) = match get_audio_config(target_freq, &host, &event_loop) {
                 Ok(result) => {
-                    println!("Spawning audio at freq {}", target_freq);
+                    println!("Spawned audio at freq {}", target_freq);
                     tx_confirm.send(true).unwrap();
                     result
                 },
@@ -93,10 +93,10 @@ impl AudioHandler {
         });
 
         if rx_confirm.recv().unwrap() {
-            println!("audio speakers connected");
+            println!("Audio output connected");
             self.sender = Some(tx_data);
         } else {
-            println!("could not connect speakers");
+            println!("Could not connect to suitable audio output");
         }
     }
 }
@@ -107,7 +107,7 @@ fn get_audio_config(freq: u32, host: &cpal::Host, event_loop: &cpal::EventLoop) 
     let formats = device.supported_output_formats().unwrap();
     let required_freq = cpal::SampleRate(freq);
     for supported in formats {
-        println!("F= channels: {:?}, min: {:?}, max: {:?}, data: {:?}", supported.channels, supported.min_sample_rate, supported.max_sample_rate, supported.data_type);
+        println!("Candidate audio format: channels: {:?}, min: {:?}, max: {:?}, data: {:?}", supported.channels, supported.min_sample_rate, supported.max_sample_rate, supported.data_type);
         if supported.min_sample_rate > required_freq || supported.max_sample_rate < required_freq {
             continue;
         }

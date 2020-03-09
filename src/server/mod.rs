@@ -89,6 +89,7 @@ pub struct GdbServer<'a> {
     packets: VecDeque<(Vec<u8>, bool)>,
     board: Board,
     hw_breakpoints: HashSet<u32>,
+    debug: bool,
 }
 
 impl GdbServer<'_> {
@@ -103,6 +104,7 @@ impl GdbServer<'_> {
             packets: VecDeque::new(),
             board: Board::new(),
             hw_breakpoints: HashSet::new(),
+            debug: get_debug_from_argv(),
         }
     }
 
@@ -119,7 +121,7 @@ impl GdbServer<'_> {
 
         match listener.accept() {
             Ok((socket, _addr)) => {
-                println!("connected");
+                println!("connected emulator");
                 GdbServer::handle_client(socket);
             }
             Err(e) => {
@@ -163,7 +165,9 @@ impl GdbServer<'_> {
                 }
             };
 
-            // println!("received request: {:?}", request);
+            if self.debug {
+                println!("received request: {:?}", request);
+            }
 
             match request {
                 Request::Acknowledge => {/* do nothing*/},
@@ -290,7 +294,9 @@ impl GdbServer<'_> {
                                 //     self.send_reply_ok();
                                 // }
                                 _ => {
-                                    println!("unknown command: {:?}", std::str::from_utf8(&command));
+                                    if self.debug {
+                                        println!("unknown command: {:?}", std::str::from_utf8(&command));
+                                    }
                                     self.send_reply_empty();
                                 }
                             }
@@ -311,7 +317,8 @@ impl GdbServer<'_> {
                         Query::AttachedToProcess { process } => {
                             match process {
                                 Some(_) => {
-                                    println!("unhandled multiprocess attached query");
+                                    println!("Unexpected multiprocess attached query");
+                                    self.send_reply_empty();
                                 }
                                 None => {
                                     self.send_reply(b"0");
@@ -319,7 +326,9 @@ impl GdbServer<'_> {
                             }
                         }
                         _ => {
-                            println!("Unhandled query: {:?}", query);
+                            if self.debug {
+                                println!("Unhandled query: {:?}", query);
+                            }
                             self.send_reply_empty();
                         }
                     }
@@ -331,12 +340,16 @@ impl GdbServer<'_> {
                             self.acknowledge = false;
                         }
                         _ => {
-                            println!("Unhandled set: {:?}", set);
+                            if self.debug {
+                                println!("Unhandled set: {:?}", set);
+                            }
                         }
                     }
                 }
                 _ => {
-                    println!("Unhandled request: {:?}", request);
+                    if let Request::Unhandled = request {} else if self.debug {
+                        println!("Unhandled request: {:?}", request);
+                    }
                     self.send_reply_empty();
                 },
             };
@@ -358,7 +371,9 @@ impl GdbServer<'_> {
         out.extend_from_slice(contents);
         out.push(b'#');
         out.extend_from_slice(get_checksum_hex(&contents).as_bytes());
-        // println!("sending reply: {:?}", std::str::from_utf8(out.as_ref()));
+        if self.debug {
+            println!("sending reply: {:?}", std::str::from_utf8(out.as_ref()));
+        }
         self.stream.write(out.as_ref()).expect("failed to send message");
     }
 
@@ -370,7 +385,6 @@ impl GdbServer<'_> {
 
     // Returns a fully formed instruction from GDB
     fn receive_request(&mut self) -> Result<Request, ()> {
-        // println!("receiving request...");
         let (packet, acknowledge) = match self.receive_packet() {
             Ok(r) => r,
             Err(e) => {
@@ -601,7 +615,9 @@ impl GdbServer<'_> {
             b"TfV" if all => Query::TracevariableFirst,
             b"TsV" if all => Query::TracevariableSubsequent,
             _ => {
-                println!("unhandled query {:?}", std::str::from_utf8(command));
+                if self.debug {
+                    println!("unrecognised query {:?}", std::str::from_utf8(command));
+                }
                 return Ok(Request::Unhandled);
             }
         }});
@@ -612,12 +628,12 @@ impl GdbServer<'_> {
         packet = &packet[1..];
         let command = leading_alpha(&packet);
         let all = command.len() == packet.len();
-
-        println!("handling {:?}", command);
         return Ok(Request::Set { set: match command {
             b"StartNoAckMode" if all => Set::NoAcknowledgmentMode,
             _ => {
-                println!("unrecognised command: {:?}", std::str::from_utf8(command));
+                if self.debug {
+                    println!("unrecognised set: {:?}", std::str::from_utf8(command));
+                }
                 return Err(());
             }
         }});
@@ -627,10 +643,14 @@ impl GdbServer<'_> {
         assert!(packet[0] == b'v');
         packet = &packet[1..];
         let command = leading_alpha(&packet);
-        println!("handling {:?}", command);
         return Ok(match command {
             b"MustReplyEmpty" => Request::MustReplyEmpty,
-            _ => Request::Unhandled,
+            _ => {
+                if self.debug {
+                    println!("unrecognised vPack: {:?}", command);
+                }
+                Request::Unhandled
+            }
         });
     }
 
@@ -659,11 +679,9 @@ impl GdbServer<'_> {
             }
         };
 
-        // if size <= 40 {
-        //     println!("TCP: {:?}", std::str::from_utf8(self.tcp_buffer[..size].as_ref()));
-        // } else {
-        //     println!("TCP (trunc): {:?}", std::str::from_utf8(self.tcp_buffer[..10].as_ref()));
-        // }
+        if self.debug {
+            println!("TCP: {:?}", std::str::from_utf8(self.tcp_buffer[..size].as_ref()));
+        }
 
         if size == 0 {
             return Ok(());
@@ -756,6 +774,16 @@ fn get_audio_from_argv() -> bool {
     let mut args = env::args();
     while let Some(arg) = args.next() {
         if arg == "-a" || arg == "--audio" {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn get_debug_from_argv() -> bool {
+    let mut args = env::args();
+    while let Some(arg) = args.next() {
+        if arg == "-d" || arg == "--debug" {
             return true;
         }
     }
