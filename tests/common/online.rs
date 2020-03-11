@@ -5,51 +5,39 @@ use std::path::Path;
 use std::process::{Child};
 use std::io::{BufRead, BufReader, Write};
 
-use crate::common::{spawn_gdb, spawn_openocd_server};
+use crate::common::{spawn_telnet, spawn_openocd_server};
 
 pub struct Online {
-    gdb: Child,
+    telnet: Child,
     openocd: Child,
 }
 
 impl Online {
-    pub fn new(elf_path: &Path, port: usize) -> Online {
-        let openocd = spawn_openocd_server(port).unwrap();
-        let gdb = spawn_gdb(&elf_path, port).unwrap();
-
-        let mut online = Online {
+    pub fn new(elf_path: &Path) -> Online {
+        let openocd = spawn_openocd_server(elf_path).unwrap();
+        let telnet = spawn_telnet().unwrap();
+        return Online {
             openocd,
-            gdb,
+            telnet,
         };
-
-        // upload_via_openocd(&elf_path).unwrap();
-
-        println!("reseting monitor");
-        online.exec_gdb("interpreter console \"monitor reset halt\"");
-        println!("reset monitor");
-
-        online.exec_gdb("-target-download");
-        online.read_until("^done").unwrap();
-
-        return online;
     }
 
-    pub fn exec_gdb(&mut self, command: &str) {
-        let gdb_stdin = self.gdb.stdin.as_mut().unwrap();
-        gdb_stdin.write(format!("{}\n", command).as_bytes()).unwrap();
+    pub fn exec_telnet(&mut self, command: &str) {
+        let telnet_stdin = self.telnet.stdin.as_mut().unwrap();
+        telnet_stdin.write(format!("{}\n", command).as_bytes()).unwrap();
     }
 
-    pub fn read_gdb_line(&mut self) -> String {
-        let mut gdb_stdout = BufReader::new(self.gdb.stdout.as_mut().unwrap());
+    pub fn read_telnet_line(&mut self) -> String {
+        let mut telnet_stdout = BufReader::new(self.telnet.stdout.as_mut().unwrap());
         let mut line = String::new();
-        gdb_stdout.read_line(&mut line).unwrap();
+        telnet_stdout.read_line(&mut line).unwrap();
         return line;
     }
 
     pub fn read_until(&mut self, start: &str) -> Result<String, String> {
-        for _ in 0..15 {
-            let line =  self.read_gdb_line();
-            println!(">>> {}", line);
+        for _ in 0..30 {
+            let line =  self.read_telnet_line();
+            write!(std::io::stdout(), ">>> {}", line);
             if line.starts_with(start) {
                 return Ok(line);
             } else if line.starts_with("^error") {
@@ -60,32 +48,33 @@ impl Online {
     }
 
     pub fn step(&mut self) {
-        self.exec_gdb("-exec-step-instruction 1");
-        self.read_until("*stopped").unwrap();
+        self.exec_telnet("step");
+        self.exec_telnet("reg");
+        self.read_until("halted:").unwrap();
     }
 
     pub fn get_registers(&mut self) -> [u32; 16] {
-        self.exec_gdb("-data-list-register-values x [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]");
-        let response = self.read_until("^done").unwrap();
+        self.exec_telnet("reg");
+        let _response = self.read_until("\n").unwrap();
 
-        if !response.starts_with("^done,register-values=") {
-            panic!("unexpected registers response");
-        }
+        // if !response.starts_with("^done,register-values=") {
+        //     panic!("unexpected registers response");
+        // }
+        //
+        // let values = &response[24..response.len() - 3];
+        //
+        // let mut split = values.split("},{");
+        // let mut values = [0u32; 16];
+        //
+        //
+        // for i in 0..=15 {
+        //     let reg_str = split.next().unwrap();
+        //     let val_str = &reg_str[format!("number=\"{}\",value=\"0x", i).len().. reg_str.len() - 1];
+        //     let val = u32::from_str_radix(val_str, 16).unwrap();
+        //     values[i] = val;
+        // }
 
-        let values = &response[24..response.len() - 3];
-
-        let mut split = values.split("},{");
-        let mut values = [0u32; 16];
-
-
-        for i in 0..=15 {
-            let reg_str = split.next().unwrap();
-            let val_str = &reg_str[format!("number=\"{}\",value=\"0x", i).len().. reg_str.len() - 1];
-            let val = u32::from_str_radix(val_str, 16).unwrap();
-            values[i] = val;
-        }
-
-        return values;
+        return [0; 16];
     }
 
     pub fn verify_state(&mut self, board: &Board) -> Result<(), String> {
@@ -105,26 +94,15 @@ impl Online {
     }
 
     pub fn close(&mut self) {
-        write!(self.gdb.stdin.as_mut().unwrap(), "-gdb-exit\n").unwrap();
+        // write!(self.telnet.stdin.as_mut().unwrap(), "shutdown\n").unwrap();
+        // write!(self.telnet.stdin.as_mut().unwrap(), "exit\n").unwrap();
 
-        println!("waiting for gdb to exit...");
-        self.gdb.wait().unwrap();
-
-        if let Err(e) = self.openocd.kill() {
-            eprintln!("Failed to kill openocd: {}", e);
-        }
+        // write!(std::io::stdout(), "waiting for telnet to exit...");
+        // self.telnet.wait().unwrap();
+        //
+        // write!(std::io::stdout(), "waiting for openocd to exit...");
+        // self.openocd.wait().unwrap();
 
         println!("done");
     }
 }
-//
-// impl Drop for Online {
-//     fn drop(&mut self) {
-//         if let Err(e) = self.gdb.kill() {
-//             eprintln!("Failed to kill gdb: {}", e);
-//         }
-//         if let Err(e) = self.openocd.kill() {
-//             eprintln!("Failed to kill openocd: {}", e);
-//         }
-//     }
-// }

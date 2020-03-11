@@ -149,12 +149,12 @@ pub fn get_online_src_path(folder: &str) -> Result<PathBuf, String> {
     return Ok(tests);
 }
 
-pub fn spawn_openocd_server(port: usize) -> Result<Child, String> {
+pub fn spawn_openocd_server(elf_path: &Path) -> Result<Child, String> {
     let mut openocd = Command::new("openocd")
                         .arg("-f")
                         .arg(get_openocd_config_path()?)
                         .arg("-c")
-                        .arg(format!("gdb_port {}", port))
+                        .arg(format!("init; program {}", elf_path.to_str().unwrap()))
                         .stdin(std::process::Stdio::piped())
                         .stdout(std::process::Stdio::piped())
                         .stderr(std::process::Stdio::piped())
@@ -165,9 +165,10 @@ pub fn spawn_openocd_server(port: usize) -> Result<Child, String> {
     for _ in 0..30 {
         line.clear();
         child_err.read_line(&mut line).unwrap();
-        println!("> {}", line);
+        write!(std::io::stdout(), "> {}", line);
 
-        if line == format!("Info : Listening on port {} for gdb connections\n", port) {
+        if line == "Info : Listening on port 4444 for telnet connections\n" {
+            // return Err(format!("Jmm"));
             return Ok(openocd);
         }
     }
@@ -212,4 +213,26 @@ pub fn spawn_gdb(elf_path: &Path, port: usize) -> Result<Child, String> {
     }
 
     return Ok(gdb);
+}
+
+pub fn spawn_telnet() -> Result<Child, String> {
+    let mut telnet = Command::new("telnet")
+                .arg("localhost")
+                .arg("4444")
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn().expect("could not spawn telnet; is it on your PATH?");
+    let mut child_out = BufReader::new(telnet.stdout.as_mut().unwrap());
+    let mut line = String::new();
+    for _ in 0..4 {
+        line.clear();
+        child_out.read_line(&mut line).unwrap();
+        write!(std::io::stdout(), "<tel> {}", line);
+
+        if line.starts_with("Open On-Chip Debugger") {
+            return Ok(telnet);
+        }
+    }
+    telnet.kill().unwrap();
+    return Err("failed to spawn telnet properly".to_string());
 }
