@@ -83,7 +83,7 @@ pub fn load_program(name: &str) -> Result<Board, String> {
     println!("linker: {:?}", linker_path);
 
     let mut src_path = PathBuf::from(&path);
-    src_path.push("instructions");
+    src_path.push("offline");
     src_path.push(name);
     println!("src: {:?}", src_path);
 
@@ -149,31 +149,38 @@ pub fn get_online_src_path(folder: &str) -> Result<PathBuf, String> {
     return Ok(tests);
 }
 
-pub fn spawn_openocd_server(port: usize) -> Result<Child, String> {
-    let mut openocd = Command::new("openocd")
+pub fn spawn_openocd_server(elf_path: &Path) -> Result<Child, String> {
+    let openocd = Command::new("openocd")
                         .arg("-f")
                         .arg(get_openocd_config_path()?)
                         .arg("-c")
-                        .arg(format!("gdb_port {}", port))
-                        .stdin(std::process::Stdio::piped())
-                        .stdout(std::process::Stdio::piped())
-                        .stderr(std::process::Stdio::piped())
+                        .arg(format!("init; program {}", elf_path.to_str().unwrap()))
+                        // .stdin(std::process::Stdio::piped())
+                        .stdin(std::process::Stdio::null())
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
                         .spawn().expect("failed to spawn openocd; is it on your PATH?");
 
-    let mut child_err = BufReader::new(openocd.stderr.as_mut().unwrap());
-    let mut line = String::new();
-    for _ in 0..30 {
-        line.clear();
-        child_err.read_line(&mut line).unwrap();
-        println!("> {}", line);
+    return Ok(openocd);
+    // TODO: Get stderr initially, but redirect to null after initialisation.
+    //       Otherwise buffer fills up because we don't read from it and we get
+    //       "mystery" hang.
 
-        if line == format!("Info : Listening on port {} for gdb connections\n", port) {
-            return Ok(openocd);
-        }
-    }
-
-    openocd.kill().unwrap();
-    return Err("failed to spawn openocd properly".to_string());
+    // let mut child_err = BufReader::new(openocd.stderr.as_mut().unwrap());
+    // let mut line = String::new();
+    // for _ in 0..30 {
+    //     line.clear();
+    //     child_err.read_line(&mut line).unwrap();
+    //     write!(std::io::stdout(), "> {}", line);
+    //
+    //     if line == "Info : Listening on port 4444 for telnet connections\n" {
+    //         // return Err(format!("Jmm"));
+    //         return Ok(openocd);
+    //     }
+    // }
+    //
+    // openocd.kill().unwrap();
+    // return Err("failed to spawn openocd properly".to_string());
 }
 
 pub fn upload_via_openocd(elf_path: &Path) -> Result<ExitStatus, String> {
