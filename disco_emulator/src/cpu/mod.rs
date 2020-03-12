@@ -140,8 +140,8 @@ impl APSR {
     fn new() -> APSR {
         return APSR {
             n: false,
-            z: true,
-            c: true,
+            z: false,
+            c: false,
             v: false,
             q: false,
             ge: 0,

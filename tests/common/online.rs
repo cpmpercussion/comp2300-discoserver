@@ -116,9 +116,9 @@ impl Online {
             return Err(format!("PC not matching: real=0x{:08X}, emulator=0x{:08X}", registers[15], board.cpu.read_instruction_pc()));
         }
 
-        // if board.cpu.read_xpsr() != registers[16] {
-        //     return Err(format!("xPSR not matching: real=0x{:08X}, emulator=0x{:08X}", registers[16], board.cpu.read_xpsr()));
-        // }
+        if board.cpu.read_xpsr() != registers[16] {
+            return Err(format!("xPSR not matching: real=0x{:08X}, emulator=0x{:08X}", registers[16], board.cpu.read_xpsr()));
+        }
 
         return Ok(());
     }
