@@ -154,7 +154,7 @@ pub fn spawn_openocd_server(elf_path: &Path) -> Result<Child, String> {
                         .arg("-f")
                         .arg(get_openocd_config_path()?)
                         .arg("-c")
-                        .arg(format!("init; program {}", elf_path.to_str().unwrap()))
+                        .arg(format!("init; program {}; reset init", elf_path.to_str().unwrap()))
                         // .stdin(std::process::Stdio::piped())
                         .stdin(std::process::Stdio::null())
                         .stdout(std::process::Stdio::null())
