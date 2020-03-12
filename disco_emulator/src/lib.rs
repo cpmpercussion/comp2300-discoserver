@@ -3,7 +3,6 @@
 extern crate goblin;
 
 mod peripherals;
-use std::io::Write;
 use peripherals::Peripherals;
 
 mod audio;
