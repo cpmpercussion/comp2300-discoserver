@@ -83,7 +83,7 @@ pub fn load_program(name: &str) -> Result<Board, String> {
     println!("linker: {:?}", linker_path);
 
     let mut src_path = PathBuf::from(&path);
-    src_path.push("instructions");
+    src_path.push("offline");
     src_path.push(name);
     println!("src: {:?}", src_path);
 
