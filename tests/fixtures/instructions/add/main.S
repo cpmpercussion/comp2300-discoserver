@@ -46,3 +46,8 @@ main:
   movs.N r4, 98
 
 .size main, . - main
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main

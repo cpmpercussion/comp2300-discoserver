@@ -35,3 +35,8 @@ branch_narrow:
   @ Branch T2 (negative jump)
   b.N branch_narrow_resume
   mov r0, 1
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main

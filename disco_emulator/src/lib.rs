@@ -3,6 +3,7 @@
 extern crate goblin;
 
 mod peripherals;
+use std::io::Write;
 use peripherals::Peripherals;
 
 mod audio;
@@ -698,15 +699,18 @@ impl Board {
             }
         }
 
-        self.cpu.write_reg(13, 0xF7FF_BF00);
-        self.cpu.write_reg(14, 0xFFFF_FFFF);
-        self.cpu.write_reg(15, (elf.entry as u32) & !0b1);
-        self.bx_write_pc(elf.entry as u32);
-
         match self.memory.load_elf(elf, &bytes) {
             Ok(_) => {}
             Err(e) => return Err(e),
         };
+
+        // https://developer.arm.com/docs/dui0553/a/the-cortex-m4-processor/programmers-model/core-registers
+        self.cpu.write_reg(13, self.memory.read_mem_a(0x0000_0000, 4).expect("failed to read memory at 0x0000_0000")); // set to value at address 0x0000_0000 on reset
+        self.cpu.write_reg(14, 0xFFFF_FFFF); // set to 0xFFFF_FFFF on reset
+        let pc = self.memory.read_mem_a(0x0000_0004, 4).expect("failed to read memory at 0x0000_0004"); // set to value at 0x0000_0004 on reset
+        println!("setting emulator pc to 0x{:08X}", pc);
+        self.cpu.write_reg(15, pc & !0b1);
+        self.bx_write_pc(pc);
 
         return Ok(());
     }

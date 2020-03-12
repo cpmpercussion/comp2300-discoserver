@@ -21,7 +21,7 @@ main:
   @ PUSH T1
   ldr sp, =_stack_end
   push.N {r0, r3, r7, lr}
-  
+
   @ PUSH T2
   ldr sp, =_stack_end
   push.W {r2-r8, r10-r12, lr}
@@ -30,3 +30,8 @@ main:
   ldr sp, =(_stack_end - 1)
   push.W {lr}
 .size main, . - main
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main

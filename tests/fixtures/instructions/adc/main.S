@@ -23,3 +23,8 @@ main:
   mov r9, 1
   adc.W r10, r9, r8, ASR 32
 .size main, . - main
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main

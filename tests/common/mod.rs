@@ -150,31 +150,37 @@ pub fn get_online_src_path(folder: &str) -> Result<PathBuf, String> {
 }
 
 pub fn spawn_openocd_server(elf_path: &Path) -> Result<Child, String> {
-    let mut openocd = Command::new("openocd")
+    let openocd = Command::new("openocd")
                         .arg("-f")
                         .arg(get_openocd_config_path()?)
                         .arg("-c")
                         .arg(format!("init; program {}", elf_path.to_str().unwrap()))
-                        .stdin(std::process::Stdio::piped())
-                        .stdout(std::process::Stdio::piped())
-                        .stderr(std::process::Stdio::piped())
+                        // .stdin(std::process::Stdio::piped())
+                        .stdin(std::process::Stdio::null())
+                        .stdout(std::process::Stdio::null())
+                        .stderr(std::process::Stdio::null())
                         .spawn().expect("failed to spawn openocd; is it on your PATH?");
 
-    let mut child_err = BufReader::new(openocd.stderr.as_mut().unwrap());
-    let mut line = String::new();
-    for _ in 0..30 {
-        line.clear();
-        child_err.read_line(&mut line).unwrap();
-        write!(std::io::stdout(), "> {}", line);
+    return Ok(openocd);
+    // TODO: Get stderr initially, but redirect to null after initialisation.
+    //       Otherwise buffer fills up because we don't read from it and we get
+    //       "mystery" hang.
 
-        if line == "Info : Listening on port 4444 for telnet connections\n" {
-            // return Err(format!("Jmm"));
-            return Ok(openocd);
-        }
-    }
-
-    openocd.kill().unwrap();
-    return Err("failed to spawn openocd properly".to_string());
+    // let mut child_err = BufReader::new(openocd.stderr.as_mut().unwrap());
+    // let mut line = String::new();
+    // for _ in 0..30 {
+    //     line.clear();
+    //     child_err.read_line(&mut line).unwrap();
+    //     write!(std::io::stdout(), "> {}", line);
+    //
+    //     if line == "Info : Listening on port 4444 for telnet connections\n" {
+    //         // return Err(format!("Jmm"));
+    //         return Ok(openocd);
+    //     }
+    // }
+    //
+    // openocd.kill().unwrap();
+    // return Err("failed to spawn openocd properly".to_string());
 }
 
 pub fn upload_via_openocd(elf_path: &Path) -> Result<ExitStatus, String> {
@@ -213,26 +219,4 @@ pub fn spawn_gdb(elf_path: &Path, port: usize) -> Result<Child, String> {
     }
 
     return Ok(gdb);
-}
-
-pub fn spawn_telnet() -> Result<Child, String> {
-    let mut telnet = Command::new("telnet")
-                .arg("localhost")
-                .arg("4444")
-                .stdin(std::process::Stdio::piped())
-                .stdout(std::process::Stdio::piped())
-                .spawn().expect("could not spawn telnet; is it on your PATH?");
-    let mut child_out = BufReader::new(telnet.stdout.as_mut().unwrap());
-    let mut line = String::new();
-    for _ in 0..4 {
-        line.clear();
-        child_out.read_line(&mut line).unwrap();
-        write!(std::io::stdout(), "<tel> {}", line);
-
-        if line.starts_with("Open On-Chip Debugger") {
-            return Ok(telnet);
-        }
-    }
-    telnet.kill().unwrap();
-    return Err("failed to spawn telnet properly".to_string());
 }

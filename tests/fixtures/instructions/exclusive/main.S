@@ -26,3 +26,8 @@ main:
   strex r3, r2, [r0]
 
 .size main, . - main
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main

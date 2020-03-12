@@ -61,3 +61,8 @@ main:
 .align 4
 lit_forward:
 .word 0xDEADBEE1
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main

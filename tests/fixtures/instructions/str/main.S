@@ -48,3 +48,8 @@ main:
   ldr r2, =0xDEADBEE6
   str.W r2, [r0, r1, LSL 3]
 .size main, . - main
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main

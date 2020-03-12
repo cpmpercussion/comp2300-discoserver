@@ -42,3 +42,8 @@ main:
   sub.W sp, sp, 0xFFF
 
 .size main, . - main
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main

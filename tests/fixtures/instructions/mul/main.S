@@ -14,3 +14,8 @@ main:
   mul.W r10, r12, r11
 
 .size main, . - main
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main

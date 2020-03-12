@@ -22,3 +22,8 @@ target:
   mov r0, 0
   bl target2
 .size target, . - target
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main
