@@ -2545,7 +2545,7 @@ impl Board {
         let rm = data >> 6;
         let (result, carry, overflow) = add_with_carry(self.read_reg(rn), !self.read_reg(rm), 1);
         self.write_reg(rd, result);
-        if self.in_it_block() {
+        if !self.in_it_block() {
             self.set_flags_nzcv(result, carry, overflow);
         }
     }
