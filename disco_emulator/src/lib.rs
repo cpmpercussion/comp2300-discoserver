@@ -259,7 +259,7 @@ impl MemoryBus {
         let location = match address {
             0x0000_0000..=0x000F_FFFF => Location::Flash(address),
             0x0800_0000..=0x080F_FFFF => Location::Flash(address - 0x0800_0000),
-            0x1000_0000..=0x1000_7FFF => Location::Flash(address - 0x1000_0000),
+            0x1000_0000..=0x1000_7FFF => Location::Ram2(address - 0x1000_0000),
             0x2000_0000..=0x2001_7FFF => Location::Ram(address - 0x2000_0000),
             0x4000_0000..=0x5FFF_FFFF => Location::Peripheral(address as u32),
             _ => {
