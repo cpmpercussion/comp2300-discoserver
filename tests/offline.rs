@@ -173,6 +173,10 @@ fn sub() {
     // SUB (reg) T1
     board.step_n(3).unwrap();
     assert_eq!(board.read_reg(1u32), 0xFFFF_FFFB);
+    assert_eq!(board.cpu.get_flags().n, true);
+    assert_eq!(board.cpu.get_flags().z, false);
+    assert_eq!(board.cpu.get_flags().c, false);
+    assert_eq!(board.cpu.get_flags().v, false);
 
     // SUB (reg) T2
     board.step_n(3).unwrap();
