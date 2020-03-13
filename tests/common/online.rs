@@ -1,12 +1,13 @@
 #[allow(dead_code)]
 
+use std::path::PathBuf;
 use disco_emulator::Board;
 use std::path::Path;
 use std::process::{Child};
 use std::io::{Read, Write};
 use std::net::{TcpStream, Shutdown};
 
-use crate::common::{spawn_openocd_server};
+use crate::common::{spawn_openocd_server, get_tests_path};
 
 pub struct Online {
     tcl: TcpStream,
@@ -126,8 +127,50 @@ impl Online {
     pub fn close(&mut self) {
         self.exec_tcl("shutdown");
         self.tcl.shutdown(Shutdown::Both).unwrap();
-        write!(std::io::stdout(), "waiting for openocd to exit...\n").unwrap();
         self.openocd.wait().unwrap();
-        write!(std::io::stdout(), "closed\n").unwrap();
     }
+}
+
+/**
+ * Used to convert fuzz test generated instructions into
+ * a valid program.
+ */
+pub fn build_program(instructions: Vec<String>) -> String {
+    let mut out = String::from(
+r###".syntax unified
+
+.global main
+.type main, %function
+main:
+"###);
+
+    for line in instructions {
+        out.push_str(&line);
+        out.push('\n');
+    }
+
+    out.push_str(
+r###"ldr lr, =0x444F4E45 @ "DONE"
+.size main, . - main
+
+.section .isr_vector, "a", %progbits
+g_pfnVectors:
+.word _stack_end
+.word main
+
+"###);
+
+    return out;
+}
+
+pub fn write_program(name: &str, contents: &str) -> PathBuf {
+    let mut tests_dir = get_tests_path().unwrap();
+    tests_dir.push("fixtures");
+    tests_dir.push("out");
+    tests_dir.push(name);
+    let src_dir = tests_dir;
+
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.S"), contents).unwrap();
+    return src_dir;
 }

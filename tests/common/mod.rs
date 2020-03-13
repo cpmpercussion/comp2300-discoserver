@@ -23,8 +23,6 @@ fn get_tests_path() -> Result<PathBuf, String> {
     path.pop();
     path.pop();
     path.push("tests");
-
-    println!("tests: {:?}", path);
     return Ok(path);
 }
 

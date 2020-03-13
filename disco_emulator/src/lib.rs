@@ -2564,9 +2564,8 @@ impl Board {
         let rn = (data >> 4) & 0xF;
         let rm = (data >> 8) & 0xF;
         let setflags = bitset(data, 12);
-
-        let shift_t = extra >> 6;
-        let shift_n = extra & 0x3F;
+        let shift_t = extra & 0b111;
+        let shift_n = extra >> 3;
 
         let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
         let (result, carry, overflow) = add_with_carry(self.read_reg(rn), !shifted, 1);

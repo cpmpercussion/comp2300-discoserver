@@ -122,7 +122,7 @@ pub enum Opcode {
     Strexb, // W: blank[8]-rd[4]-rt[4] + blank[26]-rn[4]
     Strexh, // W: blank[8]-rd[4]-rt[4] + blank[26]-rn[4]
     SubImm, // N: blank[2]-rn[3]-rd[3]-imm8[8] / W: blank[3]-setflags[1]-rn[4]-rd[4]-spill[4] + modified[30]
-    SubReg, // N: blank[7]-rm[3]-rn[3]-rd[3] / W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[21]-shift_t[3]-shift_n[6]
+    SubReg, // N: blank[7]-rm[3]-rn[3]-rd[3] / W: blank[3]-setflags[1]-rm[4]-rn[4]-rd[4] + blank[21]-shift_n[6]-shift_t[3]
     SubSpImm, // N: blank[7]-imm9[9]
     Svc,    // N: blank[8]-imm8[8]
     Sxtb,   // N: blank[12]-rm[3]-rd[3]
