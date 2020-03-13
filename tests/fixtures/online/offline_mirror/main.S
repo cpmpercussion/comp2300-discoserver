@@ -285,23 +285,23 @@ main:
   mov r6, 2
   mov r3, 7
   subs.N r1, r6, r3
-  @
-  @ @ SUB (reg) T2
-  @ mov r10, 8
-  @ mov r11, 16
-  @ sub.W r12, r11, r10
-  @
-  @ @ SUB (SP minus imm) T1
-  @ ldr sp, =0xFFFF
-  @ sub.N sp, sp, 508
-  @
-  @ @ SUB (SP minus imm) T2
-  @ ldr sp, =0xFFFF
-  @ sub.W sp, sp, (0xFF << 16 | 0xFF)
-  @
-  @ @ SUB (SP minus imm) T3
-  @ ldr sp, =0xFFFF
-  @ sub.W sp, sp, 0xFFF
+
+  @ SUB (reg) T2
+  mov r10, 8
+  mov r11, 16
+  sub.W r12, r11, r10
+
+  @ SUB (SP minus imm) T1
+  ldr sp, =0xFFFF
+  sub.N sp, sp, 508
+
+  @ SUB (SP minus imm) T2
+  ldr sp, =0xFFFF
+  sub.W sp, sp, (0xFF << 16 | 0xFF)
+
+  @ SUB (SP minus imm) T3
+  ldr sp, =0xFFFF
+  sub.W sp, sp, 0xFFF
 
 
   ldr lr, =0x444F4E45
