@@ -57,6 +57,7 @@ enum AccessType {
 pub enum Location {
     Flash(usize),
     Ram(usize),
+    Ram2(usize),
     Peripheral(u32), // we keep the passed address, and resolve in more detail
 }
 
@@ -107,6 +108,7 @@ impl ExclusiveMonitors {
 pub struct MemoryBus {
     flash: Box<[u8]>,
     data: Box<[u8]>,
+    data2: Box<[u8]>,
     peripherals: Peripherals,
 }
 
@@ -163,6 +165,7 @@ impl MemoryBus {
         return MemoryBus {
             flash: vec![0xFF; 1024 * 1024].into_boxed_slice(),
             data: vec![0xFF; 0x18000].into_boxed_slice(),
+            data2: vec![0xFF; 0x8000].into_boxed_slice(),
             peripherals: Peripherals::new(),
         };
     }
@@ -225,6 +228,7 @@ impl MemoryBus {
         return match location {
             Location::Flash(i) => read_value(&*self.flash, i, size),
             Location::Ram(i) => read_value(&*self.data, i, size),
+            Location::Ram2(i) => read_value(&*self.data2, i, size),
             Location::Peripheral(i) => self.peripherals.read(i, size),
         };
     }
@@ -255,7 +259,8 @@ impl MemoryBus {
         let location = match address {
             0x0000_0000..=0x000F_FFFF => Location::Flash(address),
             0x0800_0000..=0x080F_FFFF => Location::Flash(address - 0x0800_0000),
-            0x2000_0000..=0x2001_FFFF => Location::Ram(address - 0x2000_0000),
+            0x1000_0000..=0x1000_7FFF => Location::Flash(address - 0x1000_0000),
+            0x2000_0000..=0x2001_7FFF => Location::Ram(address - 0x2000_0000),
             0x4000_0000..=0x5FFF_FFFF => Location::Peripheral(address as u32),
             _ => {
                 return Err(MemError::OutOfBounds);
@@ -270,6 +275,9 @@ impl MemoryBus {
             Location::Flash(_) => Err(MemError::ReadOnly),
             Location::Ram(i) => {
                 write_value(value, &mut *self.data, i, size)
+            }
+            Location::Ram2(i) => {
+                write_value(value, &mut *self.data2, i, size)
             }
             Location::Peripheral(_) => self.peripherals.write(address, value, size),
         }
@@ -720,7 +728,7 @@ impl Board {
             match self.memory.read_mem_u(i, 1) {
                 Ok(i) => out.push(i as u8),
                 Err(_) => {
-                    return Ok(out);
+                    return Ok(vec![0; bytes as usize]);
                 }
             };
         }
