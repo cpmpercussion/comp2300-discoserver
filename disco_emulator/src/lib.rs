@@ -121,7 +121,7 @@ impl fmt::Debug for MemoryBus {
 fn read_value(bank: &[u8], base: usize, size: usize) -> Result<u32, MemError> {
     assert!(size == 1 || size == 2 || size == 4);
     if base + size > bank.len() {
-        println!("{} + {} > {}", base, size, bank.len());
+        // println!("{} + {} > {}", base, size, bank.len());
         return Err(MemError::OutOfBounds);
     }
 
