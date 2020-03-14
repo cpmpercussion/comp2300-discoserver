@@ -66,6 +66,14 @@ fn test_online() {
 
 fn fuzz_test(count: usize) {
     let tests: Vec<(&str, fn(usize) -> Vec<String>)> = vec![
+        ("fuzz_orr", fuzz_orr),
+        ("fuzz_orn", fuzz_orn),
+        ("fuzz_nop", fuzz_nop),
+        ("fuzz_mvn", fuzz_mvn),
+        ("fuzz_mul", fuzz_mul),
+        ("fuzz_movt", fuzz_movt),
+        ("fuzz_mov", fuzz_mov),
+        ("fuzz_mla_mls", fuzz_mla_mls),
         ("fuzz_lsr", fuzz_lsr),
         ("fuzz_lsl", fuzz_lsl),
         ("fuzz_ldr_str", fuzz_ldr_str),
@@ -659,6 +667,190 @@ fn fuzz_lsr(count: usize) -> Vec<String> {
     return out;
 }
 
+fn fuzz_mla_mls(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // MLA T1, MLS T1
+    for _ in 0..count {
+        out.push(format!("mla r{}, r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        out.push(format!("mls r{}, r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+    }
+
+    return out;
+}
+
+fn fuzz_mov(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // MOV (imm) T1 & MOV (imm) T2
+    // NOTE: Combined because mov.n shouldn't change carry, but mov.w can
+    for _ in 0..count {
+        out.push(format!("movs.N r{}, {}", rng.reg_low(), rng.imm8()));
+        out.push(format!("mov{}.W r{}, {}", rng.setflags(), rng.reg_high(), rng.thumb_expandable()));
+    }
+
+    // MOV (imm) T3
+    for _ in 0..count {
+        out.push(format!("mov.W r{}, {}", rng.reg_high(), rng.imm16()));
+    }
+
+    // MOV (reg) T1
+    for i in 0..count {
+        out.push(format!("mov.N r{}, r{}", rng.reg_high(), rng.reg_high()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    // MOV (reg) T2
+    for i in 0..count {
+        out.push(format!("movs.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+        if i % 10 == 0 {
+            rng.randomize_regs_low(&mut out);
+        }
+    }
+
+    // MOV (reg) T3
+    for i in 0..count {
+        out.push(format!("mov{}.W r{}, r{}", rng.setflags(), rng.reg_high(), rng.reg_high()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    return out;
+}
+
+fn fuzz_movt(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // MOVT T1
+    for _ in 0..count {
+        out.push(format!("movt r{}, {}", rng.reg_high(), rng.imm16()));
+    }
+
+    return out;
+}
+
+fn fuzz_mul(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // MUL T1
+    for _ in 0..count {
+        out.push(format!("muls.N r{0}, r{1}, r{0}", rng.reg_low(), rng.reg_low()));
+    }
+
+    // MUL T2
+    for _ in 0..count {
+        out.push(format!("mul.W r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high()));
+    }
+
+    return out;
+}
+
+fn fuzz_mvn(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // MVN (imm) T1
+    for _ in 0..count {
+        out.push(format!("mvn{}.W r{}, {}", rng.setflags(), rng.reg_high(), rng.thumb_expandable()));
+    }
+
+    // MVN (reg) T1
+    for i in 0..count {
+        out.push(format!("mvns.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+        if i % 10 == 0 {
+            rng.randomize_regs_low(&mut out);
+        }
+    }
+
+    // MVN (reg) T2
+    for i in 0..count {
+        out.push(format!("mvn{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.shift()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    return out;
+}
+
+fn fuzz_nop(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // NOP T1
+    for _ in 0..std::cmp::min(count, 3) {
+        out.push(format!("nop"));
+    }
+
+    return out;
+}
+
+fn fuzz_orn(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // ORN (imm) T1
+    for i in 0..count {
+        out.push(format!("orn{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.thumb_expandable()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    // ORN (reg) T1
+    for i in 0..count {
+        out.push(format!("orn{}.W r{}, r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.shift()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    return out;
+}
+
+fn fuzz_orr(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // ORR (imm) T1
+    for i in 0..count {
+        out.push(format!("orr{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.thumb_expandable()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    // ORR (reg) T1
+    for i in 0..count {
+        out.push(format!("orrs.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+        if i % 10 == 0 {
+            rng.randomize_regs_low(&mut out);
+        }
+    }
+
+    // ORR (reg) T2
+    for i in 0..count {
+        out.push(format!("orr{}.W r{}, r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.shift()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    return out;
+}
+
 struct EmuRng {
     rng: rand::prelude::StdRng,
 }
@@ -702,6 +894,12 @@ impl EmuRng {
         }
     }
 
+    fn randomize_regs_low(&mut self, out: &mut Vec<String>) {
+        for i in 0..=7 {
+            out.push(format!("mov r{}, {}", i, self.thumb_expandable()));
+        }
+    }
+
     fn imm3(&mut self) -> u32 {
         self.rng.gen_range(0, 8)
     }
@@ -720,6 +918,10 @@ impl EmuRng {
 
     fn imm13(&mut self) -> u32 {
         self.rng.gen_range(0, 0x2000)
+    }
+
+    fn imm16(&mut self) -> u32 {
+        self.rng.gen_range(0, 0x1_0000)
     }
 
     fn setflags(&mut self) -> String {
@@ -742,12 +944,14 @@ impl EmuRng {
     }
 
     fn shift(&mut self) -> String {
-        match self.range(0, 5) {
+        // LSL 0 has a relatively higher chance of occuring
+        match self.range(0, 6) {
             0 => format!("LSL {}", self.range(0, 32)),
             1 => format!("LSR {}", self.range(1, 33)),
             2 => format!("ASR {}", self.range(1, 33)),
             3 => format!("ROR {}", self.range(1, 32)),
-            _ => String::from("RRX"),
+            4 => String::from("RRX"),
+            _ => String::from("LSL 0"),
         }
     }
 }
