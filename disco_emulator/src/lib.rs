@@ -1124,6 +1124,7 @@ impl Board {
 
         let shift = self.read_reg(rm) & 0xFF;
         let (result, carry) = self.asr_c(self.read_reg(rdn), shift);
+        self.write_reg(rdn, result);
         if !self.in_it_block() {
             self.set_flags_nzc(result, carry);
         }

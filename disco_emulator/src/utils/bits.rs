@@ -242,6 +242,7 @@ mod tests {
         assert_eq!(asr_c(0xFFFF_FFFF, 1), (0xFFFF_FFFF, true));
         assert_eq!(asr_c(0xAABB_CC80, 8), (0xFFAA_BBCC, true));
         assert_eq!(asr_c(0xAABB_CC00, 8), (0xFFAA_BBCC, false));
+        assert_eq!(asr_c(0xFFFF_FFD4, 0x27), (0xFFFF_FFFF, true));
     }
 
     #[test]
