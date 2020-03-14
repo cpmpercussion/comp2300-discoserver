@@ -377,18 +377,24 @@ impl Board {
         self.audio_handler.spawn_buffered_audio(buffer_ms_size);
     }
 
-    fn get_default_handler(&self) -> Result<u32, String> {
-        // TODO: Goto fault handler (but account for when it doesn't goto valid location)
+    fn get_default_or_reset_handler(&self) -> Result<u32, String> {
         if let Ok(hard_fault_addr) = self.memory.read_mem_u(3 * 4, 4) {
             if 0x0800_0000 <= hard_fault_addr && hard_fault_addr <= 0x0800_0000 + (self.memory.flash.len() as u32) {
                 return Ok(hard_fault_addr);
             }
         }
+
+        if let Ok(reset_addr) = self.memory.read_mem_u(4, 4) {
+            if 0x0800_0000 <= reset_addr && reset_addr <= 0x0800_0000 + (self.memory.flash.len() as u32) {
+                return Ok(reset_addr);
+            }
+        }
+
         return Err(format!("Could not find fault handler"));
     }
 
     fn try_goto_default_handler(&mut self) -> Result<(), String> {
-        return match self.get_default_handler() {
+        return match self.get_default_or_reset_handler() {
             Ok(h) => {
                 self.exclusive_monitors_clear();
                 self.pending_default_handler.set(false);
