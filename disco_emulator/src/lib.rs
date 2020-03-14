@@ -2732,6 +2732,10 @@ impl Board {
         let rd_lo = extra & 0xF;
         let rd_hi = extra >> 4;
 
+        if rd_lo == rd_hi {
+            return; // tested against real board
+        }
+
         let rn_val = u64::from(self.read_reg(rn));
         let rm_val = u64::from(self.read_reg(rm));
 
@@ -2747,6 +2751,10 @@ impl Board {
         let rm = data >> 4;
         let rd_lo = extra & 0xF;
         let rd_hi = extra >> 4;
+
+        if rd_lo == rd_hi {
+            return; // tested against real board
+        }
 
         let rd_lo_val = self.read_reg(rd_lo) as u64;
         let rd_hi_val = self.read_reg(rd_hi) as u64;
@@ -2765,6 +2773,10 @@ impl Board {
         let rm = data >> 4;
         let rd_lo = extra & 0xF;
         let rd_hi = extra >> 4;
+
+        if rd_lo == rd_hi {
+            return; // tested against real board
+        }
 
         let rn_val = self.read_reg(rn) as u64;
         let rm_val = self.read_reg(rm) as u64;
