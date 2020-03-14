@@ -2704,7 +2704,7 @@ impl Board {
         let rm = extra;
         let m = self.read_reg(rm);
         let result = if m == 0 {
-            if /*IntegerZeroDivideTrappingEnabled*/ true {
+            if /*IntegerZeroDivideTrappingEnabled*/ false {
                 println!("GenerateIntegerZeroDivide");
                 self.pending_default_handler.set(true);
                 return;
