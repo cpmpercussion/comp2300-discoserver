@@ -50,14 +50,14 @@ fn test_online() {
     // These tests use the physical board, so we can only
     // run one at a time.
 
-    let programs = [
-        "offline_mirror",
-    ];
-
-    for program in programs.iter() {
-        let src_path = get_online_src_path(program).unwrap();
-        run_program(program, &src_path);
-    }
+    // let programs = [
+    //     "offline_mirror",
+    // ];
+    //
+    // for program in programs.iter() {
+    //     let src_path = get_online_src_path(program).unwrap();
+    //     run_program(program, &src_path);
+    // }
 
     for i in 1..=10 {
         writeln!(std::io::stdout(), "Fuzzing (repeat {})", i - 1).unwrap();
@@ -66,6 +66,16 @@ fn test_online() {
 }
 
 fn fuzz_test(count: usize) {
+    let name = "fuzz_asr";
+    let contents = fuzz_asr(count);
+    let src_path = write_program(name, &build_program(contents));
+    run_program(name, &src_path);
+
+    let name = "fuzz_and";
+    let contents = fuzz_and(count);
+    let src_path = write_program(name, &build_program(contents));
+    run_program(name, &src_path);
+
     let name = "fuzz_adr";
     let contents = fuzz_adr(count);
     let src_path = write_program(name, &build_program(contents));
@@ -273,6 +283,55 @@ fn fuzz_adr(count: usize) -> Vec<String> {
     // ADR T3
     for _ in 0..count {
         out.push(format!("adr.W r{}, {}", rng.reg_high(), rng.imm12()));
+    }
+
+    return out;
+}
+
+fn fuzz_and(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // AND (imm) T1
+    for _ in 0..count {
+        out.push(format!("and{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.thumb_expandable()));
+    }
+
+    // AND (reg) T1
+    for _ in 0..count {
+        out.push(format!("ands.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+    }
+
+    // AND (reg) T2
+    for _ in 0..count {
+        out.push(format!("and{}.W r{}, r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.shift()));
+    }
+
+    return out;
+}
+
+fn fuzz_asr(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // ASR (imm) T1
+    for _ in 0..count {
+        out.push(format!("asrs.N r{}, r{}, {}", rng.reg_low(), rng.reg_low(), rng.range(1, 33)));
+    }
+
+    // ASR (imm) T2
+    for _ in 0..count {
+        out.push(format!("asr{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.range(1, 33)));
+    }
+
+    // ASR (reg) T1
+    for _ in 0..count {
+        out.push(format!("asrs.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+    }
+
+    // ASR (reg) T2
+    for _ in 0..count {
+        out.push(format!("asr{}.W r{}, r{}, r{}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
     }
 
     return out;
