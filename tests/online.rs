@@ -66,6 +66,12 @@ fn test_online() {
 
 fn fuzz_test(count: usize) {
     let tests: Vec<(&str, fn(usize) -> Vec<String>)> = vec![
+        ("fuzz_smlal_smull", fuzz_smlal_smull),
+        ("fuzz_sdiv_udiv", fuzz_sdiv_udiv),
+        ("fuzz_rsb_sbc", fuzz_rsb_sbc),
+        ("fuzz_ror_rrx", fuzz_ror_rrx),
+        ("fuzz_rbit_rev_rev16_revsh", fuzz_rbit_rev_rev16_revsh),
+        ("fuzz_qadd_qsub", fuzz_qadd_qsub),
         ("fuzz_push_pop", fuzz_push_pop),
         ("fuzz_orr", fuzz_orr),
         ("fuzz_orn", fuzz_orn),
@@ -890,6 +896,120 @@ fn fuzz_push_pop(count: usize) -> Vec<String> {
         out.push(format!("ldr sp, =0x{:08X}", rng.range(0x2000_0004, 0x2001_8000)));
         out.push(format!("push.W {{r{}}}", rng.reg_high()));
         out.push(format!("pop.W {{r{}}}", rng.reg_high()));
+    }
+
+    return out;
+}
+
+fn fuzz_qadd_qsub(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // QADD T1 / QSUB T1
+    for _ in 0..count {
+        out.push(format!("qadd r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        out.push(format!("qsub r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high()));
+    }
+
+    return out;
+}
+
+fn fuzz_rbit_rev_rev16_revsh(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // All of them
+    for i in 0..count {
+        out.push(format!("rbit r{}, r{}", rng.reg_high(), rng.reg_high()));
+        out.push(format!("rev.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+        out.push(format!("rev.W r{}, r{}", rng.reg_high(), rng.reg_high()));
+        out.push(format!("rev16.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+        out.push(format!("rev16.W r{}, r{}", rng.reg_high(), rng.reg_high()));
+        out.push(format!("revsh.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+        out.push(format!("revsh.W r{}, r{}", rng.reg_high(), rng.reg_high()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    return out;
+}
+
+fn fuzz_ror_rrx(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // ROR (imm) T1 / ROR (reg) T2 / ROR (reg) T2 / RRX T1
+    for i in 0..count {
+        out.push(format!("ror{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.range(1, 32)));
+        out.push(format!("rors.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+        out.push(format!("ror{}.W r{}, r{}, r{}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        out.push(format!("rrx{}.W r{}, r{}", rng.setflags(), rng.reg_high(), rng.reg_high()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    return out;
+}
+
+fn fuzz_rsb_sbc(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // RSB (imm) T1 / RSB (imm) T2 / RSB (reg) T1 / SBC (imm) T1
+    for i in 0..count {
+        out.push(format!("rsbs.N r{}, r{}, 0", rng.reg_low(), rng.reg_low()));
+        out.push(format!("rsb{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.thumb_expandable()));
+        out.push(format!("rsb{}.W r{}, r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.shift()));
+        out.push(format!("sbc{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.thumb_expandable()));
+        out.push(format!("sbcs.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+        out.push(format!("sbc{}.W r{}, r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.shift()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    return out;
+}
+
+fn fuzz_sdiv_udiv(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    out.push(format!("mov r1, 34"));
+    out.push(format!("mov r0, 0"));
+    out.push(format!("sdiv r2, r1, r0"));
+    out.push(format!("udiv r6, r1, r0"));
+    rng.randomize_regs(&mut out);
+
+    // SDIV T1 / UDIV T1
+    for i in 0..count {
+        out.push(format!("sdiv r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        out.push(format!("udiv r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    return out;
+}
+
+fn fuzz_smlal_smull(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // SMLAL T1 / SMULL T1
+    for i in 0..count {
+        out.push(format!("smlal r{}, r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        out.push(format!("smull r{}, r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        if i % 10 == 0 {
+            rng.randomize_regs(&mut out);
+        }
     }
 
     return out;
