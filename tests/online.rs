@@ -66,6 +66,7 @@ fn test_online() {
 
 fn fuzz_test(count: usize) {
     let tests: Vec<(&str, fn(usize) -> Vec<String>)> = vec![
+        ("fuzz_push_pop", fuzz_push_pop),
         ("fuzz_orr", fuzz_orr),
         ("fuzz_orn", fuzz_orn),
         ("fuzz_nop", fuzz_nop),
@@ -846,6 +847,49 @@ fn fuzz_orr(count: usize) -> Vec<String> {
         if i % 10 == 0 {
             rng.randomize_regs(&mut out);
         }
+    }
+
+    return out;
+}
+
+fn fuzz_push_pop(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+    out.push(format!("ldr sp, =0x20018000"));
+
+    // PUSH T1 / POP T1
+    for _ in 0..count {
+        // NOTE: We never pop to PC in this test
+        let registers = rng.range(1, 256);
+        // PUSH T1
+        out.push(format!(".hword 0b10110100{:08b}", registers));
+
+        let registers = registers.reverse_bits() >> 24;
+        // POP T1
+        out.push(format!(".hword 0b10111100{:08b}", registers));
+    }
+
+    rng.randomize_regs(&mut out);
+    // PUSH T2 / POP T2
+    for _ in 0..count {
+        let registers = rng.range(1, 0x2000);
+
+        // PUSH T2
+        out.push(format!(".hword 0b1110100100101101"));
+        out.push(format!(".hword 0b000{:013b}", registers));
+
+        let registers = registers.reverse_bits() >> 24;
+        // POP T2
+        out.push(format!(".hword 0b1110100010111101"));
+        out.push(format!(".hword 0b000{:013b}", registers));
+    }
+
+    // PUSH T3 / POP T3
+    for _ in 0..count {
+        out.push(format!("ldr sp, =0x{:08X}", rng.range(0x2000_0004, 0x2001_8000)));
+        out.push(format!("push.W {{r{}}}", rng.reg_high()));
+        out.push(format!("pop.W {{r{}}}", rng.reg_high()));
     }
 
     return out;
