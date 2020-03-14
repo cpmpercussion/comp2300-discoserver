@@ -66,6 +66,8 @@ fn test_online() {
 
 fn fuzz_test(count: usize) {
     let tests: Vec<(&str, fn(usize) -> Vec<String>)> = vec![
+        ("fuzz_ldm", fuzz_ldm),
+        ("fuzz_eor", fuzz_eor),
         ("fuzz_cmp", fuzz_cmp),
         ("fuzz_cmn", fuzz_cmn),
         ("fuzz_clz", fuzz_clz),
@@ -457,6 +459,74 @@ fn fuzz_cmp(count: usize) -> Vec<String> {
     return out;
 }
 
+fn fuzz_eor(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // EOR (imm) T1
+    for _ in 0..count {
+        out.push(format!("eor{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.thumb_expandable()));
+    }
+
+    // EOR (reg) T1
+    for _ in 0..count {
+        out.push(format!("eors.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+    }
+
+    // EOR (reg) T2
+    for _ in 0..count {
+        out.push(format!("eor{}.W r{}, r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.shift()));
+    }
+
+    return out;
+}
+
+// TODO: fuzz for IT
+
+fn fuzz_ldm(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    out.push(format!("mov r0, 0x20000000"));
+    out.push(format!("mov r1, 0xD1000000"));
+    for _ in 0..=15 {
+        out.push(format!("str r1, [r0], 4"));
+        out.push(format!("add r1, 1"));
+    }
+
+    // LDM T1
+    for _ in 0..count {
+        let reg = rng.reg_low();
+        out.push(format!("mov r{}, 0x20000000", reg));
+        // Written LDM in binary to make randomised registers easier
+        out.push(format!(".hword 0b11001{:03b}{:08b}", reg, rng.range(1, 256)));
+    }
+
+    // LDM T2
+    for _ in 0..count {
+        // NOTE: Certain combinations of WBACK and register are UNPREDICTABLE (same for
+        // LDMBD). However, we'll wait until a test fails before investigating. Otherwise,
+        // it just means we emulate with even more accuracy than necessary.
+        let reg = rng.reg_low();
+        out.push(format!("mov r{}, 0x20000000", reg));
+        // Written LDM in binary to make randomised registers easier
+        out.push(format!(".hword 0b1110100010{:01b}1{:04b}", rng.range(0, 2), reg));
+        out.push(format!(".hword 0b0{:01b}0{:013b}", rng.range(0, 2), rng.imm13()));
+    }
+
+    // LDMDB T1
+    for _ in 0..count {
+        let reg = rng.reg_high();
+        out.push(format!("ldr r{}, =0x20000010", reg));
+        // Written LDMDB in binary to make randomised registers easier
+        out.push(format!(".hword 0b1110100100{:01b}1{:04b}", rng.range(0, 2), reg));
+        out.push(format!(".hword 0b0{:01b}0{:013b}", rng.range(0, 2), rng.imm13()));
+    }
+
+    return out;
+}
+
 struct EmuRng {
     rng: rand::prelude::StdRng,
 }
@@ -498,6 +568,10 @@ impl EmuRng {
 
     fn imm12(&mut self) -> u32 {
         self.rng.gen_range(0, 0x1000)
+    }
+
+    fn imm13(&mut self) -> u32 {
+        self.rng.gen_range(0, 0x2000)
     }
 
     fn setflags(&mut self) -> String {
