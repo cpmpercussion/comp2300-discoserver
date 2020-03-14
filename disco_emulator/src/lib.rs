@@ -1952,7 +1952,7 @@ impl Board {
         // A7.7.90
         let rd = data & 0xF;
         let rn = (data >> 4) & 0xF;
-        let rm = (data >> 4) & 0xF;
+        let rm = (data >> 8) & 0xF;
         let setflags = bitset(data, 12);
         let shift_n = extra >> 3;
         let shift_t = extra & 0b111;
@@ -1994,7 +1994,7 @@ impl Board {
         // A7.7.92
         let rd = data & 0xF;
         let rn = (data >> 4) & 0xF;
-        let rm = (data >> 4) & 0xF;
+        let rm = (data >> 8) & 0xF;
         let setflags = bitset(data, 12);
         let shift_t = extra & 0b111;
         let shift_n = extra >> 3;
