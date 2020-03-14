@@ -1366,7 +1366,7 @@ impl Board {
         let shift_n = extra >> 3;
 
         let shifted = self.get_shifted_register(self.read_reg(rm), shift_t, shift_n);
-        let (result, carry, overflow) = add_with_carry(self.read_reg(rn), !shifted, 0);
+        let (result, carry, overflow) = add_with_carry(self.read_reg(rn), !shifted, 1);
         self.set_flags_nzcv(result, carry, overflow);
     }
 
