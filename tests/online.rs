@@ -66,7 +66,9 @@ fn test_online() {
 
 fn fuzz_test(count: usize) {
     let tests: Vec<(&str, fn(usize) -> Vec<String>)> = vec![
-        ("fuzz_smlal_smull", fuzz_smlal_smull),
+        ("fuzz_smlal_smull_umaal_umlaal_umull", fuzz_smlal_smull_umaal_umlaal_umull),
+        ("fuzz_teq_tst", fuzz_teq_tst),
+        ("fuzz_ldm_stm", fuzz_ldm_stm),
         ("fuzz_sdiv_udiv", fuzz_sdiv_udiv),
         ("fuzz_rsb_sbc", fuzz_rsb_sbc),
         ("fuzz_ror_rrx", fuzz_ror_rrx),
@@ -84,7 +86,6 @@ fn fuzz_test(count: usize) {
         ("fuzz_lsr", fuzz_lsr),
         ("fuzz_lsl", fuzz_lsl),
         ("fuzz_ldr_str", fuzz_ldr_str),
-        ("fuzz_ldm", fuzz_ldm),
         ("fuzz_eor", fuzz_eor),
         ("fuzz_cmp", fuzz_cmp),
         ("fuzz_cmn", fuzz_cmn),
@@ -502,9 +503,11 @@ fn fuzz_eor(count: usize) -> Vec<String> {
 
 // TODO: fuzz for IT
 
-fn fuzz_ldm(count: usize) -> Vec<String> {
+fn fuzz_ldm_stm(count: usize) -> Vec<String> {
+    let count = count / 2;
     let mut out: Vec<String> = Vec::new();
     let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
 
     out.push(format!("mov r0, 0x20000000"));
     out.push(format!("mov r1, 0xD1000000"));
@@ -513,33 +516,66 @@ fn fuzz_ldm(count: usize) -> Vec<String> {
         out.push(format!("add r1, 1"));
     }
 
-    // LDM T1
+    // LDM T1 / STM T1
     for _ in 0..count {
         let reg = rng.reg_low();
-        out.push(format!("mov r{}, 0x20000000", reg));
-        // Written LDM in binary to make randomised registers easier
-        out.push(format!(".hword 0b11001{:03b}{:08b}", reg, rng.range(1, 256)));
+        let reg_store = 8;
+        let address = rng.range(0x2000_0000, 0x2001_7000) & !0b11;
+        let registers = rng.range(1, 256);
+        out.push(format!("ldr r{}, =0x{:08X}", reg, address));
+        out.push(format!("mov r{}, r{}", reg_store, reg));
+
+        // STM T1
+        out.push(format!(".hword 0b11000{:03b}{:08b} @ STM T1", reg, registers));
+
+        out.push(format!("mov r{}, r{}", reg, reg_store));
+        let registers = registers.reverse_bits() >> 24;
+        // LDM T1
+        out.push(format!(".hword 0b11001{:03b}{:08b} @ LDM T1", reg, registers));
     }
 
-    // LDM T2
+    // LDM T2 / STM T2
     for _ in 0..count {
         // NOTE: Certain combinations of WBACK and register are UNPREDICTABLE (same for
         // LDMBD). However, we'll wait until a test fails before investigating. Otherwise,
         // it just means we emulate with even more accuracy than necessary.
-        let reg = rng.reg_low();
-        out.push(format!("mov r{}, 0x20000000", reg));
-        // Written LDM in binary to make randomised registers easier
+        let reg = rng.reg_high();
+        let reg_store = rng.reg_high_not(reg);
+        let address = rng.range(0x2000_0000, 0x2001_7000) & !0b11;
+        let registers = rng.imm13();
+        out.push(format!("ldr r{}, =0x{:08X}", reg, address));
+        out.push(format!("mov r{}, r{}", reg_store, reg));
+
+        // STM T2
+        out.push(format!(".hword 0b1110100010{:01b}0{:04b}", rng.range(0, 2), reg));
+        out.push(format!(".hword 0b000{:013b}", registers));
+
+        out.push(format!("mov r{}, r{}", reg, reg_store));
+        let registers = registers.reverse_bits() >> 24;
+        // LDM T2
         out.push(format!(".hword 0b1110100010{:01b}1{:04b}", rng.range(0, 2), reg));
-        out.push(format!(".hword 0b0{:01b}0{:013b}", rng.range(0, 2), rng.imm13()));
+        out.push(format!(".hword 0b000{:013b}", registers));
     }
 
-    // LDMDB T1
+    // LDMDB T1 / STMDB T1
     for _ in 0..count {
         let reg = rng.reg_high();
-        out.push(format!("ldr r{}, =0x20000010", reg));
-        // Written LDMDB in binary to make randomised registers easier
+        let reg_store = rng.reg_high_not(reg);
+        let address = rng.range(0x2000_0000, 0x2001_7000) & !0b11;
+        let registers = rng.imm13();
+
+        out.push(format!("ldr r{}, =0x{:08X}", reg, address));
+        out.push(format!("mov r{}, r{}", reg_store, reg));
+
+        // STMDB T1
+        out.push(format!(".hword 0b1110100100{:01b}0{:04b}", rng.range(0, 2), reg));
+        out.push(format!(".hword 0b000{:013b}", registers));
+
+        out.push(format!("mov r{}, r{}", reg, reg_store));
+        let registers = registers.reverse_bits() >> 24;
+        // LDMDB T1
         out.push(format!(".hword 0b1110100100{:01b}1{:04b}", rng.range(0, 2), reg));
-        out.push(format!(".hword 0b0{:01b}0{:013b}", rng.range(0, 2), rng.imm13()));
+        out.push(format!(".hword 0b000{:013b}", registers));
     }
 
     return out;
@@ -999,7 +1035,7 @@ fn fuzz_sdiv_udiv(count: usize) -> Vec<String> {
     return out;
 }
 
-fn fuzz_smlal_smull(count: usize) -> Vec<String> {
+fn fuzz_smlal_smull_umaal_umlaal_umull(count: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut rng = EmuRng::new();
 
@@ -1007,6 +1043,31 @@ fn fuzz_smlal_smull(count: usize) -> Vec<String> {
     for i in 0..count {
         out.push(format!("smlal r{}, r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
         out.push(format!("smull r{}, r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        out.push(format!("umaal r{}, r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        out.push(format!("umlal r{}, r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        out.push(format!("umull r{}, r{}, r{}, r{}", rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+        if i % 5 == 0 {
+            rng.randomize_regs(&mut out);
+        }
+    }
+
+    return out;
+}
+
+// No fuzz for TBB (yet?)
+
+fn fuzz_teq_tst(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+
+    // TEQ (imm) T1 / TEQ (reg) T1 / TST (imm) T1 / TST (reg) T1
+    for i in 0..count {
+        out.push(format!("teq.W r{}, {}", rng.reg_high(), rng.thumb_expandable()));
+        out.push(format!("teq.W r{}, r{}, {}", rng.reg_high(), rng.reg_high(), rng.shift()));
+        out.push(format!("tst.W r{}, {}", rng.reg_high(), rng.thumb_expandable()));
+        out.push(format!("tst.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+        out.push(format!("tst.W r{}, r{}, {}", rng.reg_high(), rng.reg_high(), rng.shift()));
         if i % 10 == 0 {
             rng.randomize_regs(&mut out);
         }
@@ -1014,6 +1075,8 @@ fn fuzz_smlal_smull(count: usize) -> Vec<String> {
 
     return out;
 }
+
+// No fuzz for UDF
 
 struct EmuRng {
     rng: rand::prelude::StdRng,
