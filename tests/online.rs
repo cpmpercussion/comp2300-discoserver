@@ -1,7 +1,6 @@
 #[allow(dead_code)]
 
 extern crate rand;
-use crate::common::get_online_src_path;
 use crate::rand::Rng;
 
 use std::path::Path;
@@ -55,7 +54,7 @@ fn test_online() {
     // ];
     //
     // for program in programs.iter() {
-    //     let src_path = get_online_src_path(program).unwrap();
+    //     let src_path = common::get_online_src_path(program).unwrap();
     //     run_program(program, &src_path);
     // }
 
@@ -66,101 +65,19 @@ fn test_online() {
 }
 
 fn fuzz_test(count: usize) {
-    let name = "fuzz_asr";
-    let contents = fuzz_asr(count);
-    let src_path = write_program(name, &build_program(contents));
-    run_program(name, &src_path);
+    let tests: Vec<(&str, fn(usize) -> Vec<String>)> = vec![
+        ("fuzz_asr", fuzz_asr),
+        ("fuzz_and", fuzz_and),
+        ("fuzz_adr", fuzz_adr),
+        ("fuzz_add", fuzz_add),
+        ("fuzz_adc", fuzz_adc),
+        ("fuzz_sub", fuzz_sub),
+    ];
 
-    let name = "fuzz_and";
-    let contents = fuzz_and(count);
-    let src_path = write_program(name, &build_program(contents));
-    run_program(name, &src_path);
-
-    let name = "fuzz_adr";
-    let contents = fuzz_adr(count);
-    let src_path = write_program(name, &build_program(contents));
-    run_program(name, &src_path);
-
-    let name = "fuzz_add";
-    let contents = fuzz_add(count);
-    let src_path = write_program(name, &build_program(contents));
-    run_program(name, &src_path);
-
-    let name = "fuzz_sub";
-    let contents = fuzz_sub(count);
-    let src_path = write_program(name, &build_program(contents));
-    run_program(name, &src_path);
-
-    let name = "fuzz_adc";
-    let contents = fuzz_adc(count);
-    let src_path = write_program(name, &build_program(contents));
-    run_program(name, &src_path);
-}
-
-struct EmuRng {
-    rng: rand::prelude::StdRng,
-}
-
-impl EmuRng {
-    fn new() -> EmuRng {
-        let seed = rand::thread_rng().gen::<u64>();
-        println!("Seed is {}", seed);
-        return EmuRng {
-            rng: rand::SeedableRng::seed_from_u64(seed),
-        }
-    }
-
-    fn range(&mut self, low: u32, high: u32) -> u32 {
-        self.rng.gen_range(low, high)
-    }
-
-    fn reg_low(&mut self) -> u32 {
-        self.rng.gen_range(0, 8)
-    }
-
-    fn reg_high(&mut self) -> u32 {
-        self.rng.gen_range(0, 13)
-    }
-
-    fn imm3(&mut self) -> u32 {
-        self.rng.gen_range(0, 8)
-    }
-
-    fn imm8(&mut self) -> u32 {
-        self.rng.gen_range(0, 0x100)
-    }
-
-    fn imm12(&mut self) -> u32 {
-        self.rng.gen_range(0, 0x1000)
-    }
-
-    fn setflags(&mut self) -> String {
-        if self.rng.gen_range(0, 2) == 1 { String::new() } else { String::from("s") }
-    }
-
-    fn thumb_expandable(&mut self) -> u32 {
-        let byte = self.imm8();
-        match self.range(0, 5) {
-            0 => byte,
-            1 => byte | byte << 16,
-            2 => byte << 8 | byte << 24,
-            3 => byte | byte << 8 | byte << 16 | byte << 24,
-            _ => {
-                let byte = 1 << 7 | byte;
-                let shift = self.range(1, 25);
-                byte << shift
-            }
-        }
-    }
-
-    fn shift(&mut self) -> String {
-        match self.range(0, 5) {
-            0 => format!("LSL {}", self.range(0, 32)),
-            1 => format!("LSR {}", self.range(1, 33)),
-            2 => format!("ASR {}", self.range(1, 33)),
-            3 => format!("ROR {}", self.range(1, 32)),
-            _ => String::from("RRX"),
-        }
+    for (name, generator) in tests {
+        let contents = generator(count);
+        let src_path = write_program(name, &build_program(contents));
+        run_program(name, &src_path);
     }
 }
 
@@ -335,4 +252,71 @@ fn fuzz_asr(count: usize) -> Vec<String> {
     }
 
     return out;
+}
+
+struct EmuRng {
+    rng: rand::prelude::StdRng,
+}
+
+impl EmuRng {
+    fn new() -> EmuRng {
+        let seed = rand::thread_rng().gen::<u64>();
+        println!("Seed is {}", seed);
+        return EmuRng {
+            rng: rand::SeedableRng::seed_from_u64(seed),
+        }
+    }
+
+    fn range(&mut self, low: u32, high: u32) -> u32 {
+        self.rng.gen_range(low, high)
+    }
+
+    fn reg_low(&mut self) -> u32 {
+        self.rng.gen_range(0, 8)
+    }
+
+    fn reg_high(&mut self) -> u32 {
+        self.rng.gen_range(0, 13)
+    }
+
+    fn imm3(&mut self) -> u32 {
+        self.rng.gen_range(0, 8)
+    }
+
+    fn imm8(&mut self) -> u32 {
+        self.rng.gen_range(0, 0x100)
+    }
+
+    fn imm12(&mut self) -> u32 {
+        self.rng.gen_range(0, 0x1000)
+    }
+
+    fn setflags(&mut self) -> String {
+        if self.rng.gen_range(0, 2) == 1 { String::new() } else { String::from("s") }
+    }
+
+    fn thumb_expandable(&mut self) -> u32 {
+        let byte = self.imm8();
+        match self.range(0, 5) {
+            0 => byte,
+            1 => byte | byte << 16,
+            2 => byte << 8 | byte << 24,
+            3 => byte | byte << 8 | byte << 16 | byte << 24,
+            _ => {
+                let byte = 1 << 7 | byte;
+                let shift = self.range(1, 25);
+                byte << shift
+            }
+        }
+    }
+
+    fn shift(&mut self) -> String {
+        match self.range(0, 5) {
+            0 => format!("LSL {}", self.range(0, 32)),
+            1 => format!("LSR {}", self.range(1, 33)),
+            2 => format!("ASR {}", self.range(1, 33)),
+            3 => format!("ROR {}", self.range(1, 32)),
+            _ => String::from("RRX"),
+        }
+    }
 }
