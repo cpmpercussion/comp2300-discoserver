@@ -66,6 +66,13 @@ fn test_online() {
 
 fn fuzz_test(count: usize) {
     let tests: Vec<(&str, fn(usize) -> Vec<String>)> = vec![
+        ("fuzz_cmp", fuzz_cmp),
+        ("fuzz_cmn", fuzz_cmn),
+        ("fuzz_clz", fuzz_clz),
+        ("fuzz_exclusive", fuzz_exclusive),
+        ("fuzz_bic", fuzz_bic),
+        ("fuzz_bfc", fuzz_bfc),
+        ("fuzz_bfi", fuzz_bfi),
         ("fuzz_asr", fuzz_asr),
         ("fuzz_and", fuzz_and),
         ("fuzz_adr", fuzz_adr),
@@ -84,6 +91,7 @@ fn fuzz_test(count: usize) {
 fn fuzz_add(count: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
 
     // ADD (imm) T1
     for _ in 0..count {
@@ -126,6 +134,7 @@ fn fuzz_add(count: usize) -> Vec<String> {
 fn fuzz_sub(count: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
 
     // SUB (imm) T1
     for _ in 0..count {
@@ -163,6 +172,7 @@ fn fuzz_sub(count: usize) -> Vec<String> {
 fn fuzz_adc(count: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
 
     // ADC (imm) T1
     for _ in 0..count {
@@ -185,6 +195,7 @@ fn fuzz_adc(count: usize) -> Vec<String> {
 fn fuzz_adr(count: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
 
     // ADR T1
     for _ in 0..count {
@@ -208,6 +219,7 @@ fn fuzz_adr(count: usize) -> Vec<String> {
 fn fuzz_and(count: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
 
     // AND (imm) T1
     for _ in 0..count {
@@ -230,6 +242,7 @@ fn fuzz_and(count: usize) -> Vec<String> {
 fn fuzz_asr(count: usize) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
 
     // ASR (imm) T1
     for _ in 0..count {
@@ -249,6 +262,196 @@ fn fuzz_asr(count: usize) -> Vec<String> {
     // ASR (reg) T2
     for _ in 0..count {
         out.push(format!("asr{}.W r{}, r{}, r{}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+    }
+
+    return out;
+}
+
+// No fuzz for B
+
+fn fuzz_bfc(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // BFC T1
+    for _ in 0..count {
+        let lsb = rng.range(0, 32);
+        let width = rng.range(1, 33 - lsb);
+        out.push(format!("bfc.W r{}, {}, {}", rng.reg_high(), lsb, width));
+    }
+
+    return out;
+}
+
+fn fuzz_bfi(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // BFI T1
+    for _ in 0..count {
+        let lsb = rng.range(0, 32);
+        let width = rng.range(1, 33 - lsb);
+        out.push(format!("bfi.W r{}, r{}, {}, {}", rng.reg_high(), rng.reg_high(), lsb, width));
+    }
+
+    return out;
+}
+
+fn fuzz_bic(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // BIC (imm) T1
+    for _ in 0..count {
+        out.push(format!("bic{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.thumb_expandable()));
+    }
+
+    // BIC (reg) T1
+    for _ in 0..count {
+        out.push(format!("bics.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+    }
+
+    // BIC (reg) T2
+    for _ in 0..count {
+        out.push(format!("bic{}.W r{}, r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.shift()));
+    }
+
+    return out;
+}
+
+// No fuzz for BKPT, BL, BLX, BX, CBZ
+
+fn fuzz_exclusive(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // LDREX, STREX, CLREX
+    // NOTE: This isn't particularly effective for coverage. It's more about
+    // exclusive effects.
+    out.push(format!("ldr r0, =0x20000000"));
+    out.push(format!("mov r1, 150"));
+    out.push(format!("str r1, [r0]"));
+    for _ in 0..(count * 3) {
+        match rng.range(0, 3) {
+            0 => out.push(format!("ldrex r1, [r0]")),
+            1 => {
+                out.push(format!("add r1, 1"));
+                out.push(format!("strex r2, r1, [r0]"));
+            },
+            _ => out.push(format!("clrex")),
+        }
+    }
+
+    return out;
+}
+
+fn fuzz_clz(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // CLZ T1
+    for _ in 0..count {
+        let src_reg = rng.reg_high();
+        out.push(format!("mov r{}, {}", src_reg, rng.thumb_expandable()));
+        out.push(format!("clz r{}, r{}", rng.reg_high(), src_reg));
+    }
+
+    return out;
+}
+
+fn fuzz_cmn(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // CMN (imm) T1
+    for _ in 0..count {
+        let src_reg = rng.reg_high();
+        let value = rng.thumb_expandable();
+        out.push(format!("mov r{}, {}", src_reg, value));
+        out.push(format!("cmn.W r{}, {}", src_reg, value));
+        out.push(format!("cmn.W r{}, {}", src_reg, rng.thumb_expandable()));
+    }
+
+    // CMN (reg) T1
+    for _ in 0..count {
+        let src_reg = rng.reg_low();
+        let dest_reg = rng.reg_low();
+        let value = rng.thumb_expandable();
+        out.push(format!("mov r{}, {}", src_reg, value));
+        out.push(format!("mov r{}, {}", dest_reg, value));
+        out.push(format!("cmn.N r{}, r{}", dest_reg, src_reg));
+        out.push(format!("cmn.N r{}, r{}", dest_reg, rng.reg_low()));
+    }
+
+    // CMN (reg) T2
+    for _ in 0..count {
+        let src_reg = rng.reg_high();
+        let dest_reg = rng.reg_high();
+        out.push(format!("mov r{}, {}", src_reg, rng.thumb_expandable()));
+        out.push(format!("cmn.W r{}, r{}", dest_reg, src_reg));
+        out.push(format!("cmn.W r{}, r{}, {}", dest_reg, src_reg, rng.shift()));
+        out.push(format!("cmn.W r{}, r{}, {}", dest_reg, rng.reg_high(), rng.shift()));
+    }
+
+    return out;
+}
+
+fn fuzz_cmp(count: usize) -> Vec<String> {
+    let count = count / 2; // We have double the typical instructions per test
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // CMP (imm) T1
+    for _ in 0..count {
+        let src_reg = rng.reg_low();
+        let value = rng.imm8();
+        out.push(format!("mov r{}, {}", src_reg, value));
+        out.push(format!("cmp.N r{}, {}", src_reg, value));
+        out.push(format!("cmp.N r{}, {}", src_reg, rng.imm8()));
+    }
+
+    // CMP (imm) T2
+    for _ in 0..count {
+        let src_reg = rng.reg_high();
+        let value = rng.thumb_expandable();
+        out.push(format!("mov r{}, {}", src_reg, value));
+        out.push(format!("cmp.W r{}, {}", src_reg, value));
+        out.push(format!("cmp.W r{}, {}", src_reg, rng.thumb_expandable()));
+    }
+
+    // CMP (reg) T1
+    for _ in 0..count {
+        let src_reg = rng.reg_low();
+        let dest_reg = rng.reg_low();
+        let value = rng.thumb_expandable();
+        out.push(format!("mov r{}, {}", src_reg, value));
+        out.push(format!("mov r{}, {}", dest_reg, value));
+        out.push(format!("cmp.N r{}, r{}", dest_reg, src_reg));
+        out.push(format!("cmp.N r{}, r{}", dest_reg, rng.reg_low()));
+    }
+
+    // CMP (reg) T2
+    for _ in 0..count {
+        let src_reg = rng.reg_high();
+        let dest_reg = if src_reg > 8 { rng.reg_high() } else { rng.range(8, 13) };
+        let value = rng.thumb_expandable();
+        out.push(format!("mov r{}, {}", src_reg, value));
+        out.push(format!("mov r{}, {}", dest_reg, value));
+        out.push(format!("cmp.N r{}, r{}", dest_reg, src_reg));
+        out.push(format!("cmp.N r{}, r{}", dest_reg, if dest_reg > 8 { rng.reg_high() } else { rng.range(8, 13) }));
+    }
+
+    // CMN (reg) T3
+    for _ in 0..count {
+        let src_reg = rng.reg_high();
+        let dest_reg = rng.reg_high();
+        out.push(format!("mov r{}, {}", src_reg, rng.thumb_expandable()));
+        out.push(format!("cmp.W r{}, r{}", dest_reg, src_reg));
+        out.push(format!("cmp.W r{}, r{}, {}", dest_reg, src_reg, rng.shift()));
+        out.push(format!("cmp.W r{}, r{}, {}", dest_reg, rng.reg_high(), rng.shift()));
     }
 
     return out;
@@ -277,6 +480,12 @@ impl EmuRng {
 
     fn reg_high(&mut self) -> u32 {
         self.rng.gen_range(0, 13)
+    }
+
+    fn randomize_regs(&mut self, out: &mut Vec<String>) {
+        for i in 0..=12 {
+            out.push(format!("mov r{}, {}", i, self.thumb_expandable()));
+        }
     }
 
     fn imm3(&mut self) -> u32 {
