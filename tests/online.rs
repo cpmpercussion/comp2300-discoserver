@@ -66,6 +66,9 @@ fn test_online() {
 
 fn fuzz_test(count: usize) {
     let tests: Vec<(&str, fn(usize) -> Vec<String>)> = vec![
+        ("fuzz_lsr", fuzz_lsr),
+        ("fuzz_lsl", fuzz_lsl),
+        ("fuzz_ldr_str", fuzz_ldr_str),
         ("fuzz_ldm", fuzz_ldm),
         ("fuzz_eor", fuzz_eor),
         ("fuzz_cmp", fuzz_cmp),
@@ -527,6 +530,135 @@ fn fuzz_ldm(count: usize) -> Vec<String> {
     return out;
 }
 
+fn fuzz_ldr_str(count: usize) -> Vec<String> {
+    let count = std::cmp::min(count, 60);
+
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // LDR (imm) T1 / STR (imm) T1
+    for _ in 0..count {
+        let address = rng.range(0x2000_0000, 0x2001_7FFD);
+        let offset  = rng.imm5() << 2;
+
+        let src_reg = rng.reg_low();
+        out.push(format!("ldr r{}, =0x{:08X}", src_reg, address));
+        out.push(format!("str.N r{}, [r{}]", rng.reg_low(), src_reg));
+        out.push(format!("ldr.N r{}, [r{}]", rng.reg_low(), src_reg));
+
+        if address + offset <= 0x2001_7FFC {
+            out.push(format!("ldr r{}, =0x{:08X}", src_reg, address));
+            out.push(format!("str.N r{}, [r{}, {}]", rng.reg_low(), src_reg, offset));
+            out.push(format!("ldr.N r{}, [r{}, {}]", rng.reg_low(), src_reg, offset));
+        }
+    }
+
+    // LDR (imm) T2 / STR (imm) T2
+    out.push(format!("ldr sp, =0x20000400"));
+    for _ in 0..count {
+        let offset = rng.imm8() << 2;
+        out.push(format!("str.N r{}, [sp, {}]", rng.reg_low(), offset));
+        out.push(format!("ldr.N r{}, [sp, {}]", rng.reg_low(), offset));
+    }
+
+    // LDR (imm) T3 / STR (imm) T3
+    for _ in 0..count {
+        let address = rng.range(0x2000_0000, 0x2001_7FFD);
+        let offset = rng.imm12();
+        let src_reg = rng.reg_high();
+        out.push(format!("ldr r{}, =0x{:08X}", src_reg, address));
+        out.push(format!("str.W r{}, [r{}]", rng.reg_high(), src_reg));
+        out.push(format!("ldr.W r{}, [r{}]", rng.reg_high(), src_reg));
+
+        if address + offset <= 0x2001_7FFC {
+            out.push(format!("ldr r{}, =0x{:08X}", src_reg, address));
+            out.push(format!("str.W r{}, [r{}, {}]", rng.reg_high(), src_reg, offset));
+            out.push(format!("ldr.W r{}, [r{}, {}]", rng.reg_high(), src_reg, offset));
+        }
+    }
+
+    // LDR (imm) T4 / STR (imm) T4
+    for _ in 0..(count / 3) {
+        let address = rng.range(0x2000_0000, 0x2001_7FFD);
+        let offset = rng.imm8();
+        let src_reg = rng.reg_high();
+        let sign = if rng.range(0, 2) == 0 { "-" } else { "+" };
+
+        out.push(format!("ldr r{}, =0x{:08X}", src_reg, address));
+        out.push(format!("str.W r{}, [r{}, -{}]", rng.reg_high_not(src_reg), src_reg, offset));
+        out.push(format!("ldr.W r{}, [r{}, -{}]", rng.reg_high_not(src_reg), src_reg, offset));
+
+        out.push(format!("ldr r{}, =0x{:08X}", src_reg, address));
+        out.push(format!("str.W r{}, [r{}], {}{}", rng.reg_high_not(src_reg), src_reg, sign, offset));
+        out.push(format!("ldr r{}, =0x{:08X}", src_reg, address));
+        out.push(format!("ldr.W r{}, [r{}], {}{}", rng.reg_high_not(src_reg), src_reg, sign, offset));
+
+        out.push(format!("ldr r{}, =0x{:08X}", src_reg, address));
+        out.push(format!("str.W r{}, [r{}, {}{}]!", rng.reg_high_not(src_reg), src_reg, sign, offset));
+        out.push(format!("ldr r{}, =0x{:08X}", src_reg, address));
+        out.push(format!("ldr.W r{}, [r{}, {}{}]!", rng.reg_high_not(src_reg), src_reg, sign, offset));
+    }
+
+    return out;
+}
+
+fn fuzz_lsl(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // LSL (imm) T1
+    for _ in 0..count {
+        out.push(format!("lsls.N r{}, r{}, {}", rng.reg_low(), rng.reg_low(), rng.range(0, 32)));
+    }
+
+    // LSL (imm) T2
+    for _ in 0..count {
+        out.push(format!("lsl{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.range(0, 32)));
+    }
+
+    // LSL (reg) T1
+    for _ in 0..count {
+        out.push(format!("lsls.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+    }
+
+    // LSL (reg) T2
+    for _ in 0..count {
+        out.push(format!("lsl{}.W r{}, r{}, r{}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+    }
+
+    return out;
+}
+
+fn fuzz_lsr(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+    rng.randomize_regs(&mut out);
+
+    // LSR (imm) T1
+    for _ in 0..count {
+        out.push(format!("lsrs.N r{}, r{}, {}", rng.reg_low(), rng.reg_low(), rng.range(1, 33)));
+    }
+
+    // LSR (imm) T2
+    for _ in 0..count {
+        out.push(format!("lsr{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.range(1, 33)));
+    }
+
+    // LSR (reg) T1
+    for _ in 0..count {
+        out.push(format!("lsrs.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+    }
+
+    // LSR (reg) T2
+    for _ in 0..count {
+        out.push(format!("lsr{}.W r{}, r{}, r{}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high()));
+    }
+
+    return out;
+}
+
 struct EmuRng {
     rng: rand::prelude::StdRng,
 }
@@ -552,6 +684,18 @@ impl EmuRng {
         self.rng.gen_range(0, 13)
     }
 
+    fn reg_high_not(&mut self, not: u32) -> u32 {
+        let mut reg = self.reg_high();
+        if reg == not {
+            if not == 0 {
+                reg += 1;
+            } else {
+                reg -= 1;
+            }
+        }
+        reg
+    }
+
     fn randomize_regs(&mut self, out: &mut Vec<String>) {
         for i in 0..=12 {
             out.push(format!("mov r{}, {}", i, self.thumb_expandable()));
@@ -560,6 +704,10 @@ impl EmuRng {
 
     fn imm3(&mut self) -> u32 {
         self.rng.gen_range(0, 8)
+    }
+
+    fn imm5(&mut self) -> u32 {
+        self.rng.gen_range(0, 0b100000)
     }
 
     fn imm8(&mut self) -> u32 {
