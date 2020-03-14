@@ -66,6 +66,11 @@ fn test_online() {
 }
 
 fn fuzz_test(count: usize) {
+    let name = "fuzz_adr";
+    let contents = fuzz_adr(count);
+    let src_path = write_program(name, &build_program(contents));
+    run_program(name, &src_path);
+
     let name = "fuzz_add";
     let contents = fuzz_add(count);
     let src_path = write_program(name, &build_program(contents));
@@ -73,6 +78,11 @@ fn fuzz_test(count: usize) {
 
     let name = "fuzz_sub";
     let contents = fuzz_sub(count);
+    let src_path = write_program(name, &build_program(contents));
+    run_program(name, &src_path);
+
+    let name = "fuzz_adc";
+    let contents = fuzz_adc(count);
     let src_path = write_program(name, &build_program(contents));
     run_program(name, &src_path);
 }
@@ -218,6 +228,51 @@ fn fuzz_sub(count: usize) -> Vec<String> {
     // SUB (reg) T2
     for _ in 0..count {
         out.push(format!("sub{}.W r{}, r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.shift()));
+    }
+
+    return out;
+}
+
+fn fuzz_adc(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // ADC (imm) T1
+    for _ in 0..count {
+        out.push(format!("adc{}.W r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.thumb_expandable()));
+    }
+
+    // ADC (reg) T1
+    for _ in 0..count {
+        out.push(format!("adcs.N r{}, r{}", rng.reg_low(), rng.reg_low()));
+    }
+
+    // ADC (reg) T2
+    for _ in 0..count {
+        out.push(format!("adc{}.W r{}, r{}, r{}, {}", rng.setflags(), rng.reg_high(), rng.reg_high(), rng.reg_high(), rng.shift()));
+    }
+
+    return out;
+}
+
+fn fuzz_adr(count: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut rng = EmuRng::new();
+
+    // ADR T1
+    for _ in 0..count {
+        // Labels are messy to get right (and exhaustive), so we directly encode it instead
+        out.push(format!(".hword 0b10100{:03b}{:08b}", rng.reg_low(), rng.imm8()));
+    }
+
+    // ADR T2
+    for _ in 0..count {
+        out.push(format!("adr.W r{}, -{}", rng.reg_high(), rng.imm12()));
+    }
+
+    // ADR T3
+    for _ in 0..count {
+        out.push(format!("adr.W r{}, {}", rng.reg_high(), rng.imm12()));
     }
 
     return out;
