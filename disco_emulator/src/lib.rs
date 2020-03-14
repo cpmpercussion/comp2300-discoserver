@@ -58,6 +58,7 @@ pub enum Location {
     Flash(usize),
     Ram(usize),
     Ram2(usize),
+    SystemMemory(u32),
     Peripheral(u32), // we keep the passed address, and resolve in more detail
 }
 
@@ -215,6 +216,11 @@ impl MemoryBus {
         return self.read_mem_a_with_priv(address, size, &AccessType::Normal);
     }
 
+    fn read_system_memory(&self, _address: u32, size: usize) -> Result<u32, MemError> {
+        // TODO: emulate system memory properly.
+        return Ok(0xFFFF_FFFF >> (32 - 8 * size));
+    }
+
     fn read_mem_a_with_priv(&self, address: u32, size: usize, _access_type: &AccessType) -> Result<u32, MemError> {
         // B2.3.4 p583
         if address != align(address, size as u32) {
@@ -227,6 +233,7 @@ impl MemoryBus {
         let location = self.address_to_physical(address)?;
         return match location {
             Location::Flash(i) => read_value(&*self.flash, i, size),
+            Location::SystemMemory(i) => self.read_system_memory(i, size),
             Location::Ram(i) => read_value(&*self.data, i, size),
             Location::Ram2(i) => read_value(&*self.data2, i, size),
             Location::Peripheral(i) => self.peripherals.read(i, size),
@@ -260,6 +267,7 @@ impl MemoryBus {
             0x0000_0000..=0x000F_FFFF => Location::Flash(address),
             0x0800_0000..=0x080F_FFFF => Location::Flash(address - 0x0800_0000),
             0x1000_0000..=0x1000_7FFF => Location::Ram2(address - 0x1000_0000),
+            0x1FFF_F000..=0x1FFF_FFFF => Location::SystemMemory(address as u32),
             0x2000_0000..=0x2001_7FFF => Location::Ram(address - 0x2000_0000),
             0x4000_0000..=0x5FFF_FFFF => Location::Peripheral(address as u32),
             _ => {
@@ -272,7 +280,8 @@ impl MemoryBus {
     fn write_mem_u(&mut self, address: u32, size: usize, value: u32) -> Result<(), MemError> {
         let location = self.address_to_physical(address)?;
         return match location {
-            Location::Flash(_) => Err(MemError::ReadOnly),
+            Location::Flash(_) |
+            Location::SystemMemory(_) => Err(MemError::ReadOnly),
             Location::Ram(i) => {
                 write_value(value, &mut *self.data, i, size)
             }
