@@ -2370,9 +2370,13 @@ impl Board {
         let rd_lo = extra & 0xF;
         let rd_hi = extra >> 4;
 
+        if rd_lo == rd_hi {
+            return; // tested against real board
+        }
+
         let rd_lo_val = self.read_reg(rd_lo) as u64;
         let rd_hi_val = self.read_reg(rd_hi) as u64;
-        let addend = rd_hi_val << 32 + rd_lo_val;
+        let addend = (rd_hi_val << 32) + rd_lo_val;
         let rn_val = i64::from(self.read_reg(rn) as i32);
         let rm_val = i64::from(self.read_reg(rm) as i32);
         let result = ((rn_val * rm_val) as u64).wrapping_add(addend);
@@ -2386,6 +2390,10 @@ impl Board {
         let rm = data >> 4;
         let rd_lo = extra & 0xF;
         let rd_hi = extra >> 4;
+
+        if rd_lo == rd_hi {
+            return; // tested against real board
+        }
 
         let rn_val = i64::from(self.read_reg(rn) as i32);
         let rm_val = i64::from(self.read_reg(rm) as i32);
@@ -2744,7 +2752,7 @@ impl Board {
         let rd_hi_val = self.read_reg(rd_hi) as u64;
         let rn_val = self.read_reg(rn) as u64;
         let rm_val = self.read_reg(rm) as u64;
-        let addend = rd_hi_val << 32 + rd_lo_val;
+        let addend = (rd_hi_val << 32) + rd_lo_val;
         let result = (rn_val * rm_val).wrapping_add(addend);
         let (upper, lower) = bits::split_u64(result);
         self.write_reg(rd_hi, upper);
