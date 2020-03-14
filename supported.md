@@ -3,6 +3,7 @@
 ### General
 Peripherals and interrupts are not supported. Audio specifically is supported, by detecting the call to `BSP_AUDIO_OUT_Play_Sample`.
 
+
 ### Arguments
 See the generated `platformio.ini` file for where to add arguments (in the `debug_server` property).
 
@@ -21,7 +22,7 @@ See the generated `platformio.ini` file for where to add arguments (in the `debu
     5
     ```
     for a 5 second buffer (it will gather 5 seconds worth of samples and then play them, then gather the next 5 seconds and play, and so on).
-    
+
     Try without a buffer first, and only use it if the sound is glitchy (actions such as moving your mouse should make the sound even worse if this is the case).
 
     Check the debug console for when the buffer is being filled and emptied. You may see `underrun` errors; these can be ignored. The debugger cannot be paused while the buffer is being emptied (i.e., sound is being played).
