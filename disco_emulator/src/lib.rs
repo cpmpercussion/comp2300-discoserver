@@ -1045,7 +1045,7 @@ impl Board {
 
     fn w_adr(&mut self, data: u32, extra: u32) {
         let rd = data;
-        let imm32 = sign_extend(12, extra);
+        let imm32 = sign_extend(extra, 12);
         let result = word_align(self.read_pc()).wrapping_add(imm32);
         self.write_reg(rd, result);
     }
