@@ -5,7 +5,8 @@ use server::GdbServer;
 
 fn main() {
     if get_version_from_argv() {
-        println!("disco-emulator v{}.{}.{}", 1, 1, 0);
+        println!("disco-emulator v{}.{}.{}", 1, 1, 1);
+        println!("disco-server v{}.{}.{}", 1, 0, 0);
         return;
     }
 

@@ -1,6 +1,6 @@
 [package]
 name = "disco_emulator"
-version = "0.1.0"
+version = "1.1.1"
 authors = ["Benjamin Gray <bengray178@gmail.com>"]
 edition = "2018"
 
