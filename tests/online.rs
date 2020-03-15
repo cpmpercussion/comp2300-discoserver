@@ -49,14 +49,14 @@ fn test_online() {
     // These tests use the physical board, so we can only
     // run one at a time.
 
-    // let programs = [
-    //     "offline_mirror",
-    // ];
-    //
-    // for program in programs.iter() {
-    //     let src_path = common::get_online_src_path(program).unwrap();
-    //     run_program(program, &src_path);
-    // }
+    let programs = [
+        "offline_mirror",
+    ];
+
+    for program in programs.iter() {
+        let src_path = common::get_online_src_path(program).unwrap();
+        run_program(program, &src_path);
+    }
 
     for i in 1..=10 {
         writeln!(std::io::stdout(), "Fuzzing (repeat {})", i - 1).unwrap();
