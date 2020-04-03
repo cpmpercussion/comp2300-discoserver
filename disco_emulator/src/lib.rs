@@ -301,7 +301,7 @@ impl MemoryBus {
 #[derive(Debug)]
 pub struct Board {
     tick: u128,
-    audio_handler: AudioHandler,
+    pub audio_handler: AudioHandler,
     instruction_cache: InstructionCache,
     pub cpu: CPU,
     pub memory: MemoryBus,

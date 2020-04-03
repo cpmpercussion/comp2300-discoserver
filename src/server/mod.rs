@@ -771,7 +771,7 @@ fn get_tcp_port_from_argv() -> Option<String> {
     return None;
 }
 
-fn get_elf_file_path_from_argv() -> Option<PathBuf> {
+pub fn get_elf_file_path_from_argv() -> Option<PathBuf> {
     let mut args = env::args();
     while let Some(arg) = args.next() {
         if arg == "-kernel" {

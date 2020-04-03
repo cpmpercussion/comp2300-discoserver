@@ -21,7 +21,9 @@ impl AudioHandler {
     pub fn handle(&mut self, amplitude: i16) {
         self.samples += 1;
         match &self.sender {
-            Some(rt) => { rt.send(amplitude).unwrap() },
+            Some(rt) => {
+                let _ = rt.send(amplitude);
+            },
             None => {},
         }
     }
@@ -184,6 +186,10 @@ impl AudioHandler {
         } else {
             println!("Could not connect to suitable audio output");
         }
+    }
+
+    pub fn set_observer(&mut self, observer: SyncSender<i16>) {
+        self.sender = Some(observer);
     }
 }
 
