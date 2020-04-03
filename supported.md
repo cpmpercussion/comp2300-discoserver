@@ -8,6 +8,8 @@ Peripherals and interrupts are not supported. Audio specifically is supported, b
 See the generated `platformio.ini` file for where to add arguments (in the `debug_server` property).
 
 - To check the emulator version, pass `--version`
+- To specify the ELF file, pass `-kernel <path>`
+- To print a list of sound samples, pass `--samples <start> <end>`
 - If you want sound to work, pass `--audio`. Verify by checking the `DEBUG CONSOLE` output for audio related messages. A working audio connection looks something like this
     ```
     Candidate audio format: channels: 1, min: SampleRate(1), max: SampleRate(192000), data: I16
