@@ -119,6 +119,10 @@ impl fmt::Debug for MemoryBus {
     }
 }
 
+pub fn get_version() -> String {
+    return format!(env!("CARGO_PKG_VERSION"));
+}
+
 fn read_value(bank: &[u8], base: usize, size: usize) -> Result<u32, MemError> {
     assert!(size == 1 || size == 2 || size == 4);
     if base + size > bank.len() {

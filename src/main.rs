@@ -3,7 +3,7 @@
 mod server;
 use server::{GdbServer, get_elf_file_path_from_argv};
 
-use disco_emulator::Board;
+use disco_emulator::{self, Board};
 
 use std::sync::mpsc::sync_channel;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -12,8 +12,8 @@ use std::thread;
 
 fn main() {
     if get_version_from_argv() {
-        println!("disco-emulator v{}.{}.{}", 1, 1, 1);
-        println!("disco-server v{}.{}.{}", 1, 0, 0);
+        println!("disco-emulator v{}", disco_emulator::get_version());
+        println!("disco-server v{}", env!("CARGO_PKG_VERSION"));
         return;
     }
 

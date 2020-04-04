@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Version info now sourced from Cargo.toml file. Fixes inconsistent `--version` results.
+
 ## 1.1.2 - 2020-04-03
 
 ### Fixed
