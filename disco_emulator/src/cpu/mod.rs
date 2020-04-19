@@ -313,7 +313,7 @@ impl CPU {
             Condition::CarrySet => self.apsr.c,
             Condition::CarryClear => !self.apsr.c,
             Condition::Negative => self.apsr.n,
-            Condition::PosOrZero => self.apsr.n,
+            Condition::PosOrZero => !self.apsr.n,
             Condition::Overflow => self.apsr.v,
             Condition::NotOverflow => !self.apsr.v,
             Condition::UHigher => self.apsr.c && !self.apsr.z,
