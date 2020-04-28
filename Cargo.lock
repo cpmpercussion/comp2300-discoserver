@@ -106,7 +106,7 @@ dependencies = [
 
 [[package]]
 name = "disco_emulator"
-version = "1.1.2"
+version = "1.2.0"
 dependencies = [
  "cpal 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "goblin 0.0.22 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -114,9 +114,9 @@ dependencies = [
 
 [[package]]
 name = "discoserver"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
- "disco_emulator 1.1.2",
+ "disco_emulator 1.2.0",
  "rand 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
