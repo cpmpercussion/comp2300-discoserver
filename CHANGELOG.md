@@ -1,11 +1,11 @@
 # Changelog (disco-server)
 
-## Unreleased
+## 1.2.0 - 2020-04-29
 
 ### Changed
 
+- Removed `--audio` flag (see emulator 1.2.0 change).
 - Version info now sourced from Cargo.toml file. Fixes inconsistent `--version` results.
-- Fix positive-or-zero condition check
 
 ## 1.1.0 - 2020-04-03
 
