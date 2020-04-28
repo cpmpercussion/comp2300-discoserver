@@ -62,6 +62,24 @@ pub enum Location {
     Peripheral(u32), // we keep the passed address, and resolve in more detail
 }
 
+// Gets the audio buffer amount in seconds
+pub fn get_buffer_from_argv() -> Option<u32> {
+    let mut args = std::env::args();
+    while let Some(arg) = args.next() {
+        if arg == "--buffer" {
+            let amount = args.next()?;
+            return Some(match amount.parse::<u32>() {
+                Ok(v) => v,
+                Err(e) => {
+                    println!("Failed to read audio buffer amount: {}", e);
+                    return None;
+                }
+            });
+        }
+    }
+    return None;
+}
+
 #[derive(Debug)]
 pub struct ExclusiveMonitors {
     region: Option<()>,
@@ -1279,9 +1297,29 @@ impl Board {
             Some(name) => {
                 if name == "BSP_AUDIO_OUT_Play_Sample" || name == "audio_play_sample" {
                     self.audio_handler.handle((self.read_reg(0u32) & 0xFFFF) as i16);
+
+                    // Enforce the calling convention
+                    // These numbers were randomly generated :)
+                    self.write_reg(0u32, 0x803f0f9u32);
+                    self.write_reg(1u32, 0x59d27baeu32);
+                    self.write_reg(2u32, 0x3216aa20u32);
+                    self.write_reg(3u32, 0xb4f23d1au32);
+                    self.write_reg(12u32, 0x7687f9e9u32);
+                } else if name == "init" || name == "audio_init" {
+                    match get_buffer_from_argv() {
+                        Some(b) => self.spawn_buffered_audio(b * 1000),
+                        None => self.spawn_audio(),
+                    }
+
+                    self.write_reg(0u32, 0x9df0f3fbu32);
+                    self.write_reg(1u32, 0x90a9230du32);
+                    self.write_reg(2u32, 0xAAAABBBBu32);
+                    self.write_reg(3u32, 0xe2b9a7a9u32);
+                    self.write_reg(12u32, 0x6c63fe2eu32);
                 } else {
                     println!("Skipping call to {}", name);
                 }
+
             }
             None => {
                 self.branch_write_pc(address);

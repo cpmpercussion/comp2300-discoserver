@@ -134,14 +134,14 @@ impl GdbServer<'_> {
     fn handle_client(mut stream: TcpStream) {
         let mut server = GdbServer::new(&mut stream, 4096);
 
-        if let Err(e) = server.run(get_audio_from_argv()) {
+        if let Err(e) = server.run() {
             println!("server error: {:?}", e);
         };
 
         stream.shutdown(Shutdown::Both).expect("shutdown call failed");
     }
 
-    fn run(&mut self, audio: bool) -> Result<(), ()> {
+    fn run(&mut self) -> Result<(), ()> {
         if let Err(e) = self.stream.set_nodelay(true) {
             println!("cannot set no delay on TCP stream: {}", e);
         };
@@ -150,22 +150,6 @@ impl GdbServer<'_> {
             self.board.load_elf_from_path(&path).expect("failed to load from ELF file");
         } else {
             println!("ELF file path not provided");
-        }
-
-        if audio {
-            match get_buffer_from_argv() {
-                Some(b) => {
-                    if b == 0 {
-                        println!("Cannot buffer audio for 0 seconds; not using buffer");
-                        self.board.spawn_audio();
-                    } else {
-                        self.board.spawn_buffered_audio(b * 1000);
-                    }
-                },
-                None => {
-                    self.board.spawn_audio();
-                }
-            }
         }
 
         loop {
@@ -782,15 +766,15 @@ pub fn get_elf_file_path_from_argv() -> Option<PathBuf> {
     return None;
 }
 
-fn get_audio_from_argv() -> bool {
-    let mut args = env::args();
-    while let Some(arg) = args.next() {
-        if arg == "-a" || arg == "--audio" {
-            return true;
-        }
-    }
-    return false;
-}
+// fn get_audio_from_argv() -> bool {
+//     let mut args = env::args();
+//     while let Some(arg) = args.next() {
+//         if arg == "-a" || arg == "--audio" {
+//             return true;
+//         }
+//     }
+//     return false;
+// }
 
 fn get_debug_from_argv() -> bool {
     let mut args = env::args();
@@ -802,23 +786,23 @@ fn get_debug_from_argv() -> bool {
     return false;
 }
 
-// Gets the audio buffer amount in seconds
-fn get_buffer_from_argv() -> Option<u32> {
-    let mut args = env::args();
-    while let Some(arg) = args.next() {
-        if arg == "--buffer" {
-            let amount = args.next()?;
-            return Some(match amount.parse::<u32>() {
-                Ok(v) => v,
-                Err(e) => {
-                    println!("Failed to read audio buffer amount: {}", e);
-                    return None;
-                }
-            });
-        }
-    }
-    return None;
-}
+// // Gets the audio buffer amount in seconds
+// pub fn get_buffer_from_argv() -> Option<u32> {
+//     let mut args = env::args();
+//     while let Some(arg) = args.next() {
+//         if arg == "--buffer" {
+//             let amount = args.next()?;
+//             return Some(match amount.parse::<u32>() {
+//                 Ok(v) => v,
+//                 Err(e) => {
+//                     println!("Failed to read audio buffer amount: {}", e);
+//                     return None;
+//                 }
+//             });
+//         }
+//     }
+//     return None;
+// }
 
 fn parse_read_memory(mut data: &[u8]) -> Result<(u32, u32), ()> {
     assert!(data[0] == b'm');
