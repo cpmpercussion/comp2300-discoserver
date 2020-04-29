@@ -1,5 +1,11 @@
 # Changelog (disco-server)
 
+## 1.2.1 - 2020-04-29
+
+### Changed
+
+- `--debug` flag now prints out CLI arguments as well
+
 ## 1.2.0 - 2020-04-29
 
 ### Changed

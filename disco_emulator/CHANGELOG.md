@@ -1,5 +1,11 @@
 # Changelog (disco-emulator)
 
+## 1.2.1 - 2020-04-29
+
+### Fixed
+
+- Only accept first audio handler, so multiple `bl init` calls don't break & sample plotter works
+
 ## 1.2.0 - 2020-04-29
 
 ### Changed
