@@ -766,17 +766,7 @@ pub fn get_elf_file_path_from_argv() -> Option<PathBuf> {
     return None;
 }
 
-// fn get_audio_from_argv() -> bool {
-//     let mut args = env::args();
-//     while let Some(arg) = args.next() {
-//         if arg == "-a" || arg == "--audio" {
-//             return true;
-//         }
-//     }
-//     return false;
-// }
-
-fn get_debug_from_argv() -> bool {
+pub fn get_debug_from_argv() -> bool {
     let mut args = env::args();
     while let Some(arg) = args.next() {
         if arg == "-d" || arg == "--debug" {
@@ -785,24 +775,6 @@ fn get_debug_from_argv() -> bool {
     }
     return false;
 }
-
-// // Gets the audio buffer amount in seconds
-// pub fn get_buffer_from_argv() -> Option<u32> {
-//     let mut args = env::args();
-//     while let Some(arg) = args.next() {
-//         if arg == "--buffer" {
-//             let amount = args.next()?;
-//             return Some(match amount.parse::<u32>() {
-//                 Ok(v) => v,
-//                 Err(e) => {
-//                     println!("Failed to read audio buffer amount: {}", e);
-//                     return None;
-//                 }
-//             });
-//         }
-//     }
-//     return None;
-// }
 
 fn parse_read_memory(mut data: &[u8]) -> Result<(u32, u32), ()> {
     assert!(data[0] == b'm');

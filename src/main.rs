@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 mod server;
-use server::{GdbServer, get_elf_file_path_from_argv};
+use server::{GdbServer, get_elf_file_path_from_argv, get_debug_from_argv};
 
 use disco_emulator::{self, Board};
 
@@ -11,6 +11,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 fn main() {
+    if get_debug_from_argv() {
+        println!("CLI args: {:?}", std::env::args());
+    }
+
     if get_version_from_argv() {
         println!("disco-emulator v{}", disco_emulator::get_version());
         println!("disco-server v{}", env!("CARGO_PKG_VERSION"));
