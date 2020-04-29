@@ -29,6 +29,11 @@ impl AudioHandler {
     }
 
     pub fn spawn_audio(&mut self) {
+        if let Some(_) = self.sender {
+            println!("Attempt to spawn audio failed: handler already registered");
+            return;
+        }
+
         let target_freq = 48_000;
         let (tx_data, rx_data) = sync_channel::<i16>(32); // board uses ~6
         let (tx_confirm, rx_confirm) = sync_channel::<bool>(1);
@@ -103,6 +108,11 @@ impl AudioHandler {
     }
 
     pub fn spawn_buffered_audio(&mut self, buffer_ms: u32) {
+        if let Some(_) = self.sender {
+            println!("Attempt to spawn buffered audio failed: handler already registered");
+            return;
+        }
+
         let target_freq = 48_000;
         let target_buffer_fill = (buffer_ms * target_freq / 1000) as usize;
         let (tx_data, rx_data) = sync_channel::<i16>(32); // board uses ~6
