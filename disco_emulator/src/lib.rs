@@ -513,10 +513,9 @@ impl Board {
         let extra = instr.1 & !(0b11 << 30);
 
         if self.cpu.itstate.active() {
-            let execute = self.cpu.check_condition(self.cpu.itstate.condition());
+            let should_execute = self.cpu.check_condition(self.cpu.itstate.condition());
             self.cpu.itstate.advance();
-            if !execute {
-                println!("IT condition failed");
+            if !should_execute {
                 return Ok(());
             }
         }
@@ -614,7 +613,7 @@ impl Board {
             Opcode::Umull  => self.w_umull(data, extra),
             _ => {
                 // unsafe { unreachable_unchecked() }
-                println!("Unimplemented wide instruction {:?} : {:#06X} + {:#010X}", opcode, data, extra);
+                return Err(format!("Unimplemented wide instruction {:?} : {:#06X} + {:#010X}", opcode, data, extra));
             }
         }
         return Ok(());
@@ -690,7 +689,7 @@ impl Board {
             Opcode::Uxth   => self.n_uxth(data),
             _ => {
                 // unsafe { unreachable_unchecked() }
-                println!("Unimplemented narrow instruction {:?} - {:#06X}", opcode, data);
+                return Err(format!("Unimplemented narrow instruction {:?} - {:#06X}", opcode, data));
             }
         }
 
