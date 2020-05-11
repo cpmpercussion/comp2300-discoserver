@@ -1296,26 +1296,42 @@ impl Board {
         match self.branch_map.get(&address) {
             Some(name) => {
                 if name == "BSP_AUDIO_OUT_Play_Sample" || name == "audio_play_sample" {
-                    self.audio_handler.handle((self.read_reg(0u32) & 0xFFFF) as i16);
+                    // play sample has uint8 return value: 0 for success, 1 for failure
+                    // it seems to replicate the return value in r2 as well. r3 seems to
+                    // be 0xFFFF_FFFF after a failure. The carry flag seems to be set the
+                    // first time after a call to this, but not afterwards.
+                    if (!self.audio_handler.handle((self.read_reg(0u32) & 0xFFFF) as i16)) {
+                        println!("Call to {} without initialising audio", name);
+                        self.write_reg(0u32, 1);
+                        self.write_reg(2u32, 1);
+                        self.cpu.set_zero_flag(false);
+                        self.write_reg(3u32, 0xFFFF_FFFFu32);
+                    } else {
+                        self.write_reg(0u32, 0);
+                        self.write_reg(2u32, 0);
+                        self.write_reg(3u32, 0xB4F2_3D1Au32);
+                        self.cpu.set_zero_flag(true);
+                    }
+                    self.cpu.set_negative_flag(false);
+                    self.cpu.set_carry_flag(false);
+                    self.cpu.set_overflow_flag(false);
 
-                    // Enforce the calling convention
+                    // Enforce the calling convention on the other registers
                     // These numbers were randomly generated :)
-                    self.write_reg(0u32, 0x803f0f9u32);
-                    self.write_reg(1u32, 0x59d27baeu32);
-                    self.write_reg(2u32, 0x3216aa20u32);
-                    self.write_reg(3u32, 0xb4f23d1au32);
-                    self.write_reg(12u32, 0x7687f9e9u32);
+                    self.write_reg(1u32, 0x59D2_7BAEu32);
+                    self.write_reg(12u32, 0x7687_F9E9u32);
                 } else if name == "init" || name == "audio_init" {
+                    // init has void return value, so randomise everything
                     match get_buffer_from_argv() {
                         Some(b) => self.spawn_buffered_audio(b * 1000),
                         None => self.spawn_audio(),
                     }
 
-                    self.write_reg(0u32, 0x9df0f3fbu32);
-                    self.write_reg(1u32, 0x90a9230du32);
-                    self.write_reg(2u32, 0xAAAABBBBu32);
-                    self.write_reg(3u32, 0xe2b9a7a9u32);
-                    self.write_reg(12u32, 0x6c63fe2eu32);
+                    self.write_reg(0u32, 0x9DF0_F3FBu32);
+                    self.write_reg(1u32, 0x90A9_230Du32);
+                    self.write_reg(2u32, 0xAAAA_BBBBu32);
+                    self.write_reg(3u32, 0xE2B9_A7A9u32);
+                    self.write_reg(12u32, 0x6C63_FE2Eu32);
                 } else {
                     println!("Skipping call to {}", name);
                 }

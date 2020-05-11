@@ -18,13 +18,16 @@ impl AudioHandler {
         };
     }
 
-    pub fn handle(&mut self, amplitude: i16) {
+    pub fn handle(&mut self, amplitude: i16) -> bool {
         self.samples += 1;
         match &self.sender {
             Some(rt) => {
                 let _ = rt.send(amplitude);
+                return true;
             },
-            None => {},
+            None => {
+                return false;
+            },
         }
     }
 
