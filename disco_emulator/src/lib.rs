@@ -1300,7 +1300,7 @@ impl Board {
                     // it seems to replicate the return value in r2 as well. r3 seems to
                     // be 0xFFFF_FFFF after a failure. The carry flag seems to be set the
                     // first time after a call to this, but not afterwards.
-                    if (!self.audio_handler.handle((self.read_reg(0u32) & 0xFFFF) as i16)) {
+                    if !self.audio_handler.handle((self.read_reg(0u32) & 0xFFFF) as i16) {
                         println!("Call to {} without initialising audio", name);
                         self.write_reg(0u32, 1);
                         self.write_reg(2u32, 1);
