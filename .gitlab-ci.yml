@@ -14,12 +14,12 @@ image: "rust:latest"
 #   - apt-get install -yqq --no-install-recommends build-essential
 
 # Use cargo to test the project
-test:cargo:
-  tags:
-    - comp2300
-  script:
-    - rustc --version && cargo --version  # Print version info for debugging
-    - cargo test --workspace --verbose
+# test:cargo:
+#   tags:
+#     - comp2300
+#   script:
+#     - rustc --version && cargo --version  # Print version info for debugging
+#     - cargo test --workspace --verbose
 
 build:
   tags:
@@ -29,3 +29,8 @@ build:
     - apt-get install -yqq --no-install-recommends libasound2-dev
   script:
     - cargo build
+  artefacts:
+    paths:
+      - /builds/comp2300/2020/comp2300-disco-emulator/discoserver
+
+
