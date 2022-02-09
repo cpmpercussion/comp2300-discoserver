@@ -31,6 +31,6 @@ build:
     - cargo build
   artifacts:
     paths:
-      - /builds/comp2300/2020/comp2300-disco-emulator/discoserver
+      - target/debug/discoserver
 
 
