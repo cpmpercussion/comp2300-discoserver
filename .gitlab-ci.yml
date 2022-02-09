@@ -33,4 +33,5 @@ build:
   tags:
     - comp2300
   script:
+    - apt install libasound2-dev
     - cargo build
