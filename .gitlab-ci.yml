@@ -3,17 +3,9 @@
 # This specific template is located at:
 # https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Rust.gitlab-ci.yml
 
-# Official language image. Look for the different tagged releases at:
 # https://hub.docker.com/r/library/rust/tags/
+# could use: rust:1.58.1-buster
 image: "rust:latest"
-
-# Optional: Pick zero or more services to be used on all builds.
-# Only needed when using a docker container to run your tests in.
-# Check out: http://docs.gitlab.com/ee/ci/docker/using_docker_images.html#what-is-a-service
-# services:
-#   - mysql:latest
-#   - redis:latest
-#   - postgres:latest
 
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
@@ -32,6 +24,8 @@ test:cargo:
 build:
   tags:
     - comp2300
+  before_script:
+    - apt-get update -yqq
+    - apt-get install -yqq --no-install-recommends libasound2-dev
   script:
-    - apt install libasound2-dev
     - cargo build
