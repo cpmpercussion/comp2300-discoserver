@@ -28,3 +28,9 @@ test:cargo:
   script:
     - rustc --version && cargo --version  # Print version info for debugging
     - cargo test --workspace --verbose
+
+build:
+  tags:
+    - comp2300
+  script:
+    - cargo build
