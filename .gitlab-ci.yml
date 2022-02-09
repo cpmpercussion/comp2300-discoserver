@@ -29,7 +29,7 @@ build:
     - apt-get install -yqq --no-install-recommends libasound2-dev
   script:
     - cargo build
-  artefacts:
+  artifacts:
     paths:
       - /builds/comp2300/2020/comp2300-disco-emulator/discoserver
 
