@@ -2,9 +2,6 @@
 
 extern crate goblin;
 
-mod peripherals;
-use peripherals::Peripherals;
-
 mod audio;
 use audio::{AudioHandler};
 
@@ -57,8 +54,6 @@ enum AccessType {
 pub enum Location {
     Flash(usize),
     Ram(usize),
-    SystemMemory(u32),
-    Peripheral(u32), // we keep the passed address, and resolve in more detail
 }
 
 // Gets the audio buffer amount in seconds
@@ -126,7 +121,6 @@ impl ExclusiveMonitors {
 pub struct MemoryBus {
     flash: Box<[u8]>,
     data: Box<[u8]>,
-    peripherals: Peripherals,
 }
 
 impl fmt::Debug for MemoryBus {
@@ -186,7 +180,6 @@ impl MemoryBus {
         return MemoryBus {
             flash: vec![0xFF; 1024 * 512].into_boxed_slice(),
             data: vec![0xFF; 1024 * 124].into_boxed_slice(),
-            peripherals: Peripherals::new(),
         };
     }
 
@@ -246,9 +239,7 @@ impl MemoryBus {
         let location = self.address_to_physical(address)?;
         return match location {
             Location::Flash(i) => read_value(&*self.flash, i, size),
-            Location::SystemMemory(i) => self.read_system_memory(i, size),
             Location::Ram(i) => read_value(&*self.data, i, size),
-            Location::Peripheral(i) => self.peripherals.read(i, size),
         };
     }
 
@@ -288,12 +279,10 @@ impl MemoryBus {
     fn write_mem_u(&mut self, address: u32, size: usize, value: u32) -> Result<(), MemError> {
         let location = self.address_to_physical(address)?;
         return match location {
-            Location::Flash(_) |
-            Location::SystemMemory(_) => Err(MemError::ReadOnly),
+            Location::Flash(_) => Err(MemError::ReadOnly),
             Location::Ram(i) => {
                 write_value(value, &mut *self.data, i, size)
             }
-            Location::Peripheral(_) => self.peripherals.write(address, value, size),
         }
     }
 
