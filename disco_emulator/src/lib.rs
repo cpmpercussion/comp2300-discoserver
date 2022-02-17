@@ -57,7 +57,6 @@ enum AccessType {
 pub enum Location {
     Flash(usize),
     Ram(usize),
-    Ram2(usize),
     SystemMemory(u32),
     Peripheral(u32), // we keep the passed address, and resolve in more detail
 }
@@ -127,7 +126,6 @@ impl ExclusiveMonitors {
 pub struct MemoryBus {
     flash: Box<[u8]>,
     data: Box<[u8]>,
-    data2: Box<[u8]>,
     peripherals: Peripherals,
 }
 
@@ -186,9 +184,8 @@ impl fmt::Display for MemError {
 impl MemoryBus {
     fn new() -> MemoryBus {
         return MemoryBus {
-            flash: vec![0xFF; 1024 * 1024].into_boxed_slice(),
-            data: vec![0xFF; 0x18000].into_boxed_slice(),
-            data2: vec![0xFF; 0x8000].into_boxed_slice(),
+            flash: vec![0xFF; 1024 * 512].into_boxed_slice(),
+            data: vec![0xFF; 1024 * 124].into_boxed_slice(),
             peripherals: Peripherals::new(),
         };
     }
@@ -199,30 +196,24 @@ impl MemoryBus {
                 return Err(String::from("Unexpected program header type"));
             }
 
-            if header.p_vaddr < 0x0800_0000 {
-                continue;
-            }
-
             let phys_adr = header.p_paddr as usize;
             let offset = header.p_offset as usize;
             let size = header.p_filesz as usize;
 
-            let start_index = phys_adr - 0x0800_0000;
-
-            if start_index + size > self.flash.len() {
+            if phys_adr + size > self.flash.len() {
                 return Err(String::from("Flash too small to fit content"));
             }
 
             for i in 0..size {
-                self.flash[i + start_index] = bytes[i + offset];
+                self.flash[i + phys_adr] = bytes[i + offset];
             }
         }
         return Ok(());
     }
 
     fn get_instr_word(&self, address: u32) -> Result<u32, String> {
-        if 0x0800_0000 <= address && address <= 0x0800_0000 + (self.flash.len() as u32) {
-            let base = (address - 0x0800_0000) as usize;
+        if address <= (self.flash.len() as u32) {
+            let base = address as usize;
             let b1 = self.flash[base] as u32;
             let b2 = self.flash[base + 1] as u32;
             let b3 = self.flash[base + 2] as u32;
@@ -257,7 +248,6 @@ impl MemoryBus {
             Location::Flash(i) => read_value(&*self.flash, i, size),
             Location::SystemMemory(i) => self.read_system_memory(i, size),
             Location::Ram(i) => read_value(&*self.data, i, size),
-            Location::Ram2(i) => read_value(&*self.data2, i, size),
             Location::Peripheral(i) => self.peripherals.read(i, size),
         };
     }
@@ -287,11 +277,7 @@ impl MemoryBus {
         let address = address as usize;
         let location = match address {
             0x0000_0000..=0x000F_FFFF => Location::Flash(address),
-            0x0800_0000..=0x080F_FFFF => Location::Flash(address - 0x0800_0000),
-            0x1000_0000..=0x1000_7FFF => Location::Ram2(address - 0x1000_0000),
-            0x1FFF_F000..=0x1FFF_FFFF => Location::SystemMemory(address as u32),
-            0x2000_0000..=0x2001_7FFF => Location::Ram(address - 0x2000_0000),
-            0x4000_0000..=0x5FFF_FFFF => Location::Peripheral(address as u32),
+            0x2000_0000..=0x2001_EFFF => Location::Ram(address - 0x2000_0000),
             _ => {
                 return Err(MemError::OutOfBounds);
             }
@@ -306,9 +292,6 @@ impl MemoryBus {
             Location::SystemMemory(_) => Err(MemError::ReadOnly),
             Location::Ram(i) => {
                 write_value(value, &mut *self.data, i, size)
-            }
-            Location::Ram2(i) => {
-                write_value(value, &mut *self.data2, i, size)
             }
             Location::Peripheral(_) => self.peripherals.write(address, value, size),
         }
@@ -401,13 +384,13 @@ impl Board {
 
     fn get_default_or_reset_handler(&self) -> Result<u32, String> {
         if let Ok(hard_fault_addr) = self.memory.read_mem_u(3 * 4, 4) {
-            if 0x0800_0000 <= hard_fault_addr && hard_fault_addr <= 0x0800_0000 + (self.memory.flash.len() as u32) {
+            if hard_fault_addr <= (self.memory.flash.len() as u32) {
                 return Ok(hard_fault_addr);
             }
         }
 
         if let Ok(reset_addr) = self.memory.read_mem_u(4, 4) {
-            if 0x0800_0000 <= reset_addr && reset_addr <= 0x0800_0000 + (self.memory.flash.len() as u32) {
+            if reset_addr <= (self.memory.flash.len() as u32) {
                 return Ok(reset_addr);
             }
         }

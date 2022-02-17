@@ -29,24 +29,22 @@ impl InstructionCache {
     }
 
     pub fn get_cached(&self, address: u32) -> Result<(u32, u32), String> {
-        if 0x0800_0000 <= address && address <= 0x080F_FFFF {
-            let base = (address - 0x0800_0000) as usize;
+        if address as usize <= self.cache.len() - 2 {
+            let base = address as usize;
             return Ok((self.cache[base], self.cache[base + 1]));
         }
         return Err(String::from("Out of bounds access"));
     }
 
     pub fn write_cache_narrow(&mut self, address: u32, value: ByteInstruction) {
-        assert!(0x0800_0000 <= address && address <= 0x080F_FFFF);
-        let index = (address - 0x0800_0000) as usize;
-        self.cache[index] = value.0;
+        assert!(address as usize <= self.cache.len() - 1);
+        self.cache[address as usize] = value.0;
     }
 
     pub fn write_cache_wide(&mut self, address: u32, value: ByteInstruction) {
-        assert!(0x0800_0000 <= address && address <= 0x080F_FFFF);
-        let index = (address - 0x0800_0000) as usize;
-        self.cache[index] = value.0;
-        self.cache[index + 1] = value.1;
+        assert!(address as usize <= self.cache.len() - 1);
+        self.cache[address as usize] = value.0;
+        self.cache[(address + 1) as usize] = value.1;
     }
 }
 
