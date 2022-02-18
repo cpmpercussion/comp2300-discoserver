@@ -103,7 +103,7 @@ jobs:
       run: cargo build --verbose
     - name: zip windows artifact
       run: |
-        zip -r discoserver-windows target/debug/discoserver
+        powershell Compress-Archive target/debug/discoserver discoserver-windows.zip 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v2.3.1
       with:
