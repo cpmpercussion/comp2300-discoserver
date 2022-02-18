@@ -20,17 +20,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - name: download artifacts
-        uses: actions/download-artifact@v1
-        with:
-          name: uploads
+        uses: actions/download-artifact@v2
+      - name: Display structure of downloaded files
+        run: ls -R
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            /uploads/discoserver-linux.zip
-            /uploads/discoserver-macos.zip
-            /uploads/discoserver-windows.zip     
+            discoserver-linux.zip
+            discoserver-macos.zip
+            discoserver-windows.zip     
 
   build-linux:
     runs-on: ubuntu-latest
