@@ -41,7 +41,7 @@ jobs:
         sudo apt-get update -yqq
         sudo apt-get install -yqq --no-install-recommends libasound2-dev
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --release
     - name: zip linux artifact
       run: |
         zip -r discoserver-linux target/debug/discoserver
@@ -56,7 +56,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --release
     - name: zip macos artifact
       run: |
         zip -r discoserver-macos target/debug/discoserver
@@ -71,7 +71,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --release
     - name: zip windows artifact
       run: |
         powershell Compress-Archive target\debug\discoserver.exe discoserver-windows.zip 
