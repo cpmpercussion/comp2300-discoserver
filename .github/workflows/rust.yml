@@ -29,8 +29,8 @@ jobs:
         with:
           files: |
             discoserver/discoserver-linux.zip
-            discoserver/discoserver-macos.zip
-            discoserver/discoserver-windows.zip     
+            discoserver/discoserver-darwin.zip
+            discoserver/discoserver-win32.zip     
 
   build-linux:
     runs-on: ubuntu-latest
@@ -64,7 +64,7 @@ jobs:
       uses: actions/upload-artifact@v2.3.1
       with:
         name: discoserver
-        path: discoserver-macos.zip
+        path: discoserver-darwin.zip
 
   build-windows:
     runs-on: windows-2019
@@ -79,4 +79,4 @@ jobs:
       uses: actions/upload-artifact@v2.3.1
       with:
         name: discoserver
-        path: discoserver-windows.zip
+        path: discoserver-win32.zip
