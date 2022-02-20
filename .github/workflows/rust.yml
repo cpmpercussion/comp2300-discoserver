@@ -59,7 +59,7 @@ jobs:
       run: cargo build --verbose --release
     - name: zip macos artifact
       run: |
-        zip -j discoserver-macos target/release/discoserver
+        zip -j discoserver-darwin target/release/discoserver
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v2.3.1
       with:
@@ -74,7 +74,7 @@ jobs:
       run: cargo build --verbose --release
     - name: zip windows artifact
       run: |
-        powershell Compress-Archive -LiteralPath target\release\discoserver.exe discoserver-windows.zip 
+        powershell Compress-Archive -LiteralPath target\release\discoserver.exe discoserver-win32.zip 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v2.3.1
       with:
